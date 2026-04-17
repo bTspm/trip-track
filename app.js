@@ -552,7 +552,7 @@
         </div>
         <div class="flex items-center gap-3 pt-1">
           <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="shift-cascade" checked class="w-5 h-5 rounded bg-surface-container-high border-outline-variant accent-primary" />
+            <input type="checkbox" id="shift-cascade" class="w-5 h-5 rounded bg-surface-container-high border-outline-variant accent-primary" />
             <span class="text-sm text-on-surface-variant">Also shift remaining activities (${remaining.length - 1} more)</span>
           </label>
         </div>
@@ -626,12 +626,22 @@
                   </div>`).join('')}</div>` : ''}
                 ${done && a.rating ? `<p class="text-xs text-tertiary mt-2">${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)}${a.notes ? ` — ${h(a.notes)}` : ''}</p>` : ''}
 
-                ${(booking || a.location || a.description) ? `
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    ${booking?.address || a.location?.address || a.location?.name ? `
-                      <a href="https://maps.apple.com/?q=${encodeURIComponent(booking?.address || a.location?.address || a.location?.name)}" target="_blank" rel="noopener"
+                ${(() => {
+                  const addr = booking?.address || a.location?.address || a.location?.name;
+                  const loc = a.location;
+                  const hasLoc = addr || (loc?.lat && loc?.lng);
+                  if (!hasLoc && !booking?.phone && !booking) return '';
+                  const gq = loc?.lat && loc?.lng ? `${loc.lat},${loc.lng}` : addr;
+                  const aq = addr || (loc?.lat ? `${loc.lat},${loc.lng}` : '');
+                  return `<div class="mt-3 flex flex-wrap gap-2">
+                    ${hasLoc ? `
+                      <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq)}" target="_blank" rel="noopener"
                          class="py-2 px-3 bg-secondary-container text-on-secondary-container text-[11px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5">
-                         <span class="material-symbols-outlined text-sm">map</span> Directions
+                         <span class="material-symbols-outlined text-sm">map</span> Google
+                      </a>
+                      <a href="https://maps.apple.com/?q=${encodeURIComponent(aq)}" target="_blank" rel="noopener"
+                         class="py-2 px-3 bg-secondary-container text-on-secondary-container text-[11px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5">
+                         <span class="material-symbols-outlined text-sm">map</span> Apple
                       </a>` : ''}
                     ${booking?.phone ? `
                       <a href="tel:${booking.phone.replace(/\s/g, '')}"
@@ -643,7 +653,8 @@
                          class="py-2 px-3 bg-surface-container-high text-on-surface text-[11px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5">
                          <span class="material-symbols-outlined text-sm">confirmation_number</span> Booking
                       </a>` : ''}
-                  </div>` : ''}
+                  </div>`;
+                })()}
               </div>
             </div>
           </div>
@@ -743,9 +754,13 @@
 
           <div class="flex gap-2">
             ${b.address ? `
+              <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}" target="_blank" rel="noopener"
+                 class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5">
+                 <span class="material-symbols-outlined text-sm">map</span> Google
+              </a>
               <a href="https://maps.apple.com/?q=${encodeURIComponent(b.address)}" target="_blank" rel="noopener"
                  class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5">
-                 <span class="material-symbols-outlined text-sm">map</span> Directions
+                 <span class="material-symbols-outlined text-sm">map</span> Apple
               </a>` : ''}
             ${b.phone ? `
               <a href="tel:${b.phone.replace(/\s/g, '')}"
