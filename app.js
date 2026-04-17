@@ -852,6 +852,30 @@
           </a>`;
         })()}
 
+        <!-- Calendar View -->
+        <section class="bg-surface-container rounded-2xl p-4 space-y-3">
+          <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Trip Calendar</p>
+          <div class="grid grid-cols-5 gap-2">
+            ${trip.days.map(d => {
+              const s = daySummary(d);
+              const isCurrent = d.date === todayStr();
+              const isPast = d.date < todayStr();
+              const allDone = s.total > 0 && s.done === s.total;
+              const hasProgress = s.done > 0;
+              return `
+              <a href="#/day/${d.dayNumber}" class="rounded-xl p-2 text-center ${isCurrent ? 'terracotta-glow text-on-primary-container' : 'bg-surface-container-low'} active:scale-95 transition-transform">
+                <p class="text-[10px] font-bold ${isCurrent ? '' : 'text-on-surface-variant'}">${fmtDateShort(d.date).split(' ')[1]}</p>
+                <p class="font-headline font-bold text-sm ${isCurrent ? '' : isPast ? 'text-on-surface-variant' : 'text-on-surface'}">${d.dayNumber}</p>
+                <div class="flex justify-center gap-0.5 mt-1">
+                  ${allDone ? `<span class="material-symbols-outlined text-[10px] ${isCurrent ? '' : 'text-tertiary'} fill-icon">check_circle</span>` :
+                    hasProgress ? `<div class="w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-on-primary-container' : 'bg-tertiary'}"></div>` :
+                    `<div class="w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-on-primary-container/40' : 'bg-surface-container-highest'}"></div>`}
+                </div>
+              </a>`;
+            }).join('')}
+          </div>
+        </section>
+
         <section class="relative aspect-[5/4] rounded-2xl overflow-hidden ambient-shadow bg-surface-container-high">
           <div class="absolute inset-0 terracotta-glow opacity-80"></div>
           <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/60 to-transparent"></div>
@@ -899,14 +923,13 @@
           const gs = gasStats();
           const es = expenseStats();
           const grandTotal = bookingTotal + gs.cost + es.total;
-          if (!grandTotal) return '';
           return `
           <section class="bg-surface-container rounded-2xl p-5 space-y-3">
             <div class="flex justify-between items-center">
               <span class="text-xs font-bold uppercase tracking-widest text-on-surface">Trip Spending</span>
               <span class="font-headline text-sm font-extrabold text-primary">$${grandTotal.toFixed(0)}</span>
             </div>
-            <div class="space-y-2">
+            ${grandTotal ? `<div class="space-y-2">
               <div class="flex justify-between items-center">
                 <span class="text-sm text-on-surface-variant flex items-center gap-2"><span class="material-symbols-outlined text-sm">hotel</span> Bookings</span>
                 <span class="text-sm font-semibold">$${bookingTotal.toFixed(0)}</span>
@@ -923,6 +946,14 @@
               <div class="flex flex-wrap gap-1.5 pt-1">
                 ${Object.entries(es.byCategory).map(([k, v]) => `<span class="text-[10px] bg-surface-container-low rounded-full px-2 py-0.5 text-on-surface-variant">${h(k)} $${v.toFixed(0)}</span>`).join('')}
               </div>` : ''}
+            </div>` : ''}
+            <div class="flex gap-2 pt-1">
+              <button id="btn-gas-add-dash" class="flex-1 py-2.5 rounded-xl bg-surface-container-high text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-primary">local_gas_station</span> Gas
+              </button>
+              <button id="btn-expense-add-dash" class="flex-1 py-2.5 rounded-xl bg-surface-container-high text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-primary">receipt</span> Expense
+              </button>
             </div>
           </section>`;
         })()}
@@ -2189,7 +2220,8 @@
     const delGas = e.target.closest('[data-del-gas]');
     if (delGas) { deleteGasEntry(delGas.dataset.delGas); render(); return; }
 
-    if (e.target.closest('#btn-gas-add')) { promptGasEntry(); return; }
+    if (e.target.closest('#btn-gas-add') || e.target.closest('#btn-gas-add-dash')) { promptGasEntry(); return; }
+    if (e.target.closest('#btn-expense-add-dash')) { promptExpenseEntry(); return; }
 
     if (e.target.closest('#btn-export')) { exportTrip(); return; }
     if (e.target.closest('#btn-import')) { $('#file-import').click(); return; }
