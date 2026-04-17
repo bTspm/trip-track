@@ -217,15 +217,70 @@ Auto-generated recap at bottom of each day view.
 - **Top-rated activity** — highlights the best-rated activity of the day
 - Useful for end-of-day review and post-trip memory building
 
-### 14. Export / Import
+### 14. Running Late Quick Action
+
+One-tap schedule adjustment from the dashboard.
+
+- **Three buttons on dashboard:** +15 min, +30 min, +1 hr
+- Shifts ALL remaining pending activities for the current day in one tap
+- Only visible when viewing today's date and there are pending activities
+- No modal or confirmation — instant shift for when you're on the go
+- Uses the same time-shift logic as individual activity shift, but applied to all pending activities at once
+
+### 15. Hydration Reminders
+
+Automatic water intake reminders on hike days.
+
+- **Dashboard:** shows when today has pending hikes — "Hiking today — drink 1 quart per hour on the trail"
+- **Day view:** calculates total trail miles and recommends water quantity — "2 hikes today (~6.2 mi). Carry at least 3 quarts of water."
+- Only appears when the day has pending (not yet completed) hikes
+- Calculation: ~0.5 quarts per mile of trail distance
+
+### 16. Weather Refresh
+
+Live weather updates via Open-Meteo API.
+
+- **Refresh button** on each day's weather card (circular arrow icon)
+- Fetches current forecast from Open-Meteo free API (no API key required)
+- Coordinates set to Big Bend region (29.25, -103.25)
+- Updates: high/low temperature, rain probability, weather condition (WMO code mapping)
+- Shows "Updated at X:XX" timestamp after refresh
+- **Offline fallback** — shows "No signal — using cached weather" when fetch fails
+- Updated data persists to localStorage
+
+### 17. GPS Location Tracking
+
+Automatic location capture on key actions.
+
+- **Captured on:** activity check-off (done/skip), gas fill-up, journal entry
+- Uses browser Geolocation API with high accuracy, 5-second timeout
+- Permission requested once on first use (HTTPS required — works on GitHub Pages)
+- **On activities:** stored as `actualLocation` — shows as tappable coordinates linking to Google Maps
+- **On journal entries:** stored as `geo` — shows as a pin emoji (📍) linking to Google Maps
+- **On gas entries:** stored as `geo` — same pin link
+- All location data exports with trip JSON — creates a GPS breadcrumb trail of the actual trip route
+- Graceful failure — if location unavailable, action completes without coordinates
+
+### 18. Activity Detail Modal
+
+Tap any activity card to view full details in an expanded modal.
+
+- **Full description** with all details, alerts, and booking information
+- **Status and timing** — planned time, actual completion time, duration, rating, notes
+- **Action buttons** — directions (Google/Apple Maps), call, share, check-off/reset
+- **Booking details** — confirmation number (tap to copy), pin code, cost, notes
+- **Location** — if GPS was captured, shows tappable coordinates
+- **Hike details** — distance, difficulty, elevation gain
+
+### 19. Export / Import
 
 JSON-based data portability.
 
-- **Export** — downloads the full trip JSON including all check-offs, ratings, notes, journal entries, gas log. Filename: `{tripId}-{date}.json`
+- **Export** — downloads the full trip JSON including all check-offs, ratings, notes, journal entries, gas log, GPS coordinates. Filename: `{tripId}-{date}.json`
 - **Import** — upload a trip JSON file to replace current trip data. Validates that the file has a `days` array.
 - **Reset** — restores the original seed trip data (with confirmation prompt)
 
-### 15. PWA & Offline Support
+### 20. PWA & Offline Support
 
 Works without internet after first load.
 
@@ -242,7 +297,7 @@ Works without internet after first load.
 Desert-minimal aesthetic optimized for outdoor mobile use.
 
 - **Dark mode default** — critical for nighttime use (stargazing, desert driving)
-- **Color palette:** terracotta (#ffb68d → #df7328), sage green (#bdce89), sand (#e1c299), deep charcoal (#131313)
+- **Color palette:** terracotta (#ffb68d -> #df7328), sage green (#bdce89), sand (#e1c299), deep charcoal (#131313)
 - **No-line rule** — boundaries defined by tonal shifts, not borders
 - **Typography:** Manrope (headlines), Work Sans (body)
 - **Large tap targets** — 56px minimum for primary actions (check-off circles, buttons)
@@ -258,10 +313,10 @@ Beyond the original trip.json spec, the app adds:
 ```json
 {
   "journal": [
-    { "id": "j-123", "text": "...", "createdAt": "ISO", "dayNumber": 3 }
+    { "id": "j-123", "text": "...", "createdAt": "ISO", "dayNumber": 3, "geo": { "lat": 29.32, "lng": -103.61 } }
   ],
   "gasLog": [
-    { "id": "g-123", "location": "Alpine Chevron", "gallons": 12.5, "pricePerGal": 3.29, "total": 41.12, "createdAt": "ISO", "dayNumber": 2 }
+    { "id": "g-123", "location": "Alpine Chevron", "gallons": 12.5, "pricePerGal": 3.29, "total": 41.12, "createdAt": "ISO", "dayNumber": 2, "geo": { "lat": 30.36, "lng": -103.66 } }
   ]
 }
 ```
@@ -272,7 +327,8 @@ Activity status tracking:
   "status": "pending | done | skipped",
   "checkedAt": "ISO timestamp (actual completion time, user-adjustable)",
   "rating": 1-5,
-  "notes": "free text"
+  "notes": "free text",
+  "actualLocation": { "lat": 29.27, "lng": -103.30 }
 }
 ```
 
@@ -283,10 +339,12 @@ Activity status tracking:
 - **Trip Memory screen** — post-trip review with highlights, lowlights, "would do again / would skip", tips for next time
 - **Budget tracker** — planned vs actual spending by category
 - **Multi-trip support** — trip history, import/export multiple trips
-- **Photo gallery** — store photo references per activity
-- **Weather API integration** — live weather instead of static data
-- **Collaborative mode** — share trip state with travel partner
+- **Photo gallery** — store photo references per activity with timestamp matching
+- **Collaborative mode** — share trip state with travel partner via shared URL or QR code
 - **Claude integration UI** — direct export format optimized for Claude's planning prompt
 - **Notification reminders** — "15 min until next activity" push notifications
 - **Offline maps integration** — embedded map view with offline tile support
 - **Activity reordering** — drag and drop to rearrange day schedule
+- **Mileage odometer** — log actual odometer readings at each gas stop for real MPG tracking
+- **Trip photo timeline** — link photos from camera roll to activities by timestamp matching
+- **Multi-day weather prefetch** — fetch full trip forecast in one API call when online

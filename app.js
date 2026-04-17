@@ -445,6 +445,168 @@
     };
   };
 
+  // ---------- Activity Detail Modal ----------
+  const showActivityDetail = (actId) => {
+    const found = findActivity(actId);
+    if (!found) return;
+    const { day, activity: a } = found;
+    const done = a.status === 'done';
+    const skipped = a.status === 'skipped';
+    const booking = a.bookingRef ? state.trip.bookings.find(b => b.id === a.bookingRef) : null;
+    const addr = booking?.address || a.location?.address || a.location?.name;
+    const loc = a.location;
+    const gq = loc?.lat && loc?.lng ? `${loc.lat},${loc.lng}` : addr;
+
+    openModal(`
+      <div class="space-y-5 max-h-[75vh] overflow-y-auto">
+        <!-- Header -->
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="material-symbols-outlined ${done ? 'text-tertiary' : skipped ? 'text-on-surface-variant/60' : 'text-primary'} text-2xl">${iconFor(a.type)}</span>
+            <div class="flex-1">
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Day ${day.dayNumber} • ${fmtDateShort(day.date)}</p>
+              <h3 class="font-headline font-bold text-xl leading-tight">${h(a.title)}</h3>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-2">
+            ${done ? `<span class="text-[10px] font-bold uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-1 rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-[12px] fill-icon">check</span> Done</span>` : ''}
+            ${skipped ? `<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container-highest px-2 py-1 rounded-full">Skipped</span>` : ''}
+            ${a.highlight ? `<span class="text-[10px] font-bold uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-1 rounded-full">Highlight</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Timing -->
+        <div class="bg-surface-container-low rounded-xl p-4 space-y-2">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Planned</p>
+              <p class="text-sm font-semibold">${fmtTime12(a.time)}</p>
+            </div>
+            ${a.duration ? `<div>
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Duration</p>
+              <p class="text-sm font-semibold">${fmtDuration(a.duration)}</p>
+            </div>` : ''}
+            ${done && a.checkedAt ? `<div>
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Actual</p>
+              <p class="text-sm font-semibold text-tertiary">${fmtCheckedAt(a.checkedAt)}</p>
+            </div>` : ''}
+            ${skipped && a.checkedAt ? `<div>
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Skipped at</p>
+              <p class="text-sm font-semibold">${fmtCheckedAt(a.checkedAt)}</p>
+            </div>` : ''}
+          </div>
+        </div>
+
+        <!-- Description -->
+        ${a.description ? `
+        <div>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold mb-1">Details</p>
+          <p class="text-sm text-on-surface-variant leading-relaxed">${h(a.description)}</p>
+        </div>` : ''}
+
+        <!-- Hike stats -->
+        ${a.distance || a.difficulty || a.elevationGain ? `
+        <div class="flex flex-wrap gap-3">
+          ${a.distance ? `<div class="bg-surface-container-low rounded-xl px-3 py-2"><p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Distance</p><p class="text-sm font-bold">${h(a.distance)}</p></div>` : ''}
+          ${a.difficulty ? `<div class="bg-surface-container-low rounded-xl px-3 py-2"><p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Difficulty</p><p class="text-sm font-bold">${h(a.difficulty)}</p></div>` : ''}
+          ${a.elevationGain ? `<div class="bg-surface-container-low rounded-xl px-3 py-2"><p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Elevation</p><p class="text-sm font-bold">+${a.elevationGain} ft</p></div>` : ''}
+        </div>` : ''}
+
+        <!-- Alerts -->
+        ${a.alerts?.length ? `
+        <div>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold mb-2">Alerts</p>
+          <div class="space-y-2">
+            ${a.alerts.map(al => `
+              <div class="flex gap-2 items-start bg-surface-container-low rounded-xl p-3">
+                <span class="material-symbols-outlined text-primary text-sm mt-0.5">priority_high</span>
+                <p class="text-sm text-on-surface-variant leading-snug">${h(al)}</p>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Rating & Notes -->
+        ${done && a.rating ? `
+        <div class="bg-surface-container-low rounded-xl p-4">
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold mb-2">Your Rating</p>
+          <p class="text-lg">${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)}</p>
+          ${a.notes ? `<p class="text-sm text-on-surface-variant mt-2">${h(a.notes)}</p>` : ''}
+        </div>` : ''}
+
+        <!-- Booking -->
+        ${booking ? `
+        <div class="bg-surface-container-low rounded-xl p-4 space-y-3">
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Booking</p>
+          <p class="font-headline font-bold text-sm">${h(booking.name)}</p>
+          ${booking.confirmationNumber ? `
+            <div class="flex items-center justify-between">
+              <div><p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Confirmation</p></div>
+              <button data-copy="${h(booking.confirmationNumber)}" class="flex items-center gap-2 active:scale-95 transition-transform">
+                <span class="font-mono text-sm text-primary">${h(booking.confirmationNumber)}</span>
+                <span class="material-symbols-outlined text-sm">content_copy</span>
+              </button>
+            </div>` : ''}
+          ${booking.pinCode ? `
+            <div class="flex items-center justify-between">
+              <div><p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Pin Code</p></div>
+              <button data-copy="${h(booking.pinCode)}" class="flex items-center gap-2 active:scale-95 transition-transform">
+                <span class="font-mono text-sm text-primary">${h(booking.pinCode)}</span>
+                <span class="material-symbols-outlined text-sm">content_copy</span>
+              </button>
+            </div>` : ''}
+          ${booking.cost ? `<p class="text-sm text-on-surface-variant">Cost: <span class="font-semibold text-on-surface">$${booking.cost.toFixed(2)}</span></p>` : ''}
+          ${booking.notes ? `<p class="text-xs text-on-surface-variant leading-relaxed">${h(booking.notes)}</p>` : ''}
+        </div>` : ''}
+
+        <!-- Location -->
+        ${a.actualLocation ? `
+        <div class="bg-surface-container-low rounded-xl p-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-sm">pin_drop</span>
+          <a href="https://www.google.com/maps/search/?api=1&query=${a.actualLocation.lat},${a.actualLocation.lng}" target="_blank" rel="noopener" class="text-xs text-on-surface-variant">Checked in at ${a.actualLocation.lat.toFixed(4)}, ${a.actualLocation.lng.toFixed(4)}</a>
+        </div>` : ''}
+
+        <!-- Actions -->
+        <div class="flex flex-wrap gap-2 pt-1">
+          ${addr || gq ? `
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq || addr)}" target="_blank" rel="noopener"
+               class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5">
+               <span class="material-symbols-outlined text-sm">map</span> Google
+            </a>
+            <a href="https://maps.apple.com/?q=${encodeURIComponent(addr || gq)}" target="_blank" rel="noopener"
+               class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5">
+               <span class="material-symbols-outlined text-sm">map</span> Apple
+            </a>` : ''}
+          ${booking?.phone ? `
+            <a href="tel:${booking.phone.replace(/\s/g, '')}"
+               class="py-2.5 px-4 bg-surface-container-highest text-on-surface text-xs font-bold uppercase tracking-widest rounded-xl flex items-center gap-1.5">
+               <span class="material-symbols-outlined text-sm">call</span> Call
+            </a>` : ''}
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button data-detail-share="${a.id}" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">share</span> Share
+          </button>
+          <button data-detail-check="${a.id}" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">${done || skipped ? 'undo' : 'check'}</span> ${done || skipped ? 'Reset' : 'Check Off'}
+          </button>
+        </div>
+      </div>
+    `);
+
+    const detailShare = $('[data-detail-share]');
+    if (detailShare) {
+      detailShare.onclick = () => {
+        const txt = activityToText(a, day);
+        if (navigator.share) navigator.share({ title: a.title, text: txt }).catch(() => {});
+        else copyText(txt);
+      };
+    }
+    const detailCheck = $('[data-detail-check]');
+    if (detailCheck) {
+      detailCheck.onclick = () => { closeModal(); promptCheckoff(a.id); };
+    }
+  };
+
   // ---------- Views ----------
   const viewHome = () => {
     const trip = state.trip;
@@ -864,7 +1026,7 @@
     return `
       <div class="relative flex gap-4 mb-6">
         <button class="relative z-10 active:scale-90 transition-transform" data-check="${a.id}" aria-label="Toggle ${h(a.title)}">${circle}</button>
-        <div class="flex-1 min-w-0 ${bodyClasses}">
+        <div class="flex-1 min-w-0 ${bodyClasses} cursor-pointer" data-detail="${a.id}">
           <div class="${innerClass}">
             <div class="flex justify-between items-start gap-3 mb-2">
               <div class="flex items-center gap-2">
@@ -1598,6 +1760,23 @@
     const timeShift = e.target.closest('[data-time-shift]');
     if (timeShift) { promptTimeShift(timeShift.dataset.timeShift); return; }
 
+    const shareAct2 = e.target.closest('[data-share-act]');
+    if (shareAct2) {
+      const found = findActivity(shareAct2.dataset.shareAct);
+      if (found) {
+        const txt = activityToText(found.activity, found.day);
+        if (navigator.share) navigator.share({ title: found.activity.title, text: txt }).catch(() => {});
+        else copyText(txt);
+      }
+      return;
+    }
+
+    const detailCard = e.target.closest('[data-detail]');
+    if (detailCard && !e.target.closest('button') && !e.target.closest('a')) {
+      showActivityDetail(detailCard.dataset.detail);
+      return;
+    }
+
     const checkBtn = e.target.closest('[data-check]');
     if (checkBtn) { promptCheckoff(checkBtn.dataset.check); return; }
 
@@ -1615,18 +1794,7 @@
       return;
     }
 
-    const shareAct = e.target.closest('[data-share-act]');
-    if (shareAct) {
-      const found = findActivity(shareAct.dataset.shareAct);
-      if (found) {
-        const txt = activityToText(found.activity, found.day);
-        if (navigator.share) {
-          navigator.share({ title: found.activity.title, text: txt }).catch(() => {});
-        } else {
-          copyText(txt);
-        }
-      }
-      return;
+    if (false) { /* share handled above */ return;
     }
 
     const focusBooking = e.target.closest('[data-focus-booking]');
