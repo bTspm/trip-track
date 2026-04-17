@@ -781,11 +781,19 @@
           <p class="text-on-surface-variant text-xs mt-2">${h(trip.subtitle)}</p>
         </section>
 
-        <!-- Search bar -->
-        <button id="home-search" class="w-full flex items-center gap-3 bg-surface-container rounded-2xl px-4 py-3.5 active:scale-[0.99] transition-transform">
-          <span class="material-symbols-outlined text-on-surface-variant">search</span>
-          <span class="text-sm text-on-surface-variant/60">Search activities, bookings, packing…</span>
-        </button>
+        <!-- Quick actions bar -->
+        <div class="flex gap-2">
+          <button id="home-search" class="flex-1 flex items-center gap-2 bg-surface-container rounded-2xl px-4 py-3 active:scale-[0.99] transition-transform">
+            <span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+            <span class="text-sm text-on-surface-variant/60">Search…</span>
+          </button>
+          <button id="btn-gas-add-dash" class="px-4 py-3 bg-surface-container rounded-2xl active:scale-95 transition-transform flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary text-[20px]">local_gas_station</span>
+          </button>
+          <button id="btn-expense-add-dash" class="px-4 py-3 bg-surface-container rounded-2xl active:scale-95 transition-transform flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary text-[20px]">receipt</span>
+          </button>
+        </div>
 
         ${alerts.length ? `
         <!-- Alerts banner -->
@@ -947,14 +955,6 @@
                 ${Object.entries(es.byCategory).map(([k, v]) => `<span class="text-[10px] bg-surface-container-low rounded-full px-2 py-0.5 text-on-surface-variant">${h(k)} $${v.toFixed(0)}</span>`).join('')}
               </div>` : ''}
             </div>` : ''}
-            <div class="flex gap-2 pt-1">
-              <button id="btn-gas-add-dash" class="flex-1 py-2.5 rounded-xl bg-surface-container-high text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
-                <span class="material-symbols-outlined text-sm text-primary">local_gas_station</span> Gas
-              </button>
-              <button id="btn-expense-add-dash" class="flex-1 py-2.5 rounded-xl bg-surface-container-high text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
-                <span class="material-symbols-outlined text-sm text-primary">receipt</span> Expense
-              </button>
-            </div>
           </section>`;
         })()}
 
