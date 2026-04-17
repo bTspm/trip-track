@@ -160,6 +160,105 @@
     return { count: log.length, gallons: Math.round(totalGal * 10) / 10, cost: Math.round(totalCost * 100) / 100 };
   };
 
+  // ---------- Cell service zones ----------
+  const NO_SIGNAL_ZONES = [
+    { pattern: /chisos/i, note: 'No cell service in Chisos Basin' },
+    { pattern: /ten bits/i, note: 'Very limited signal at Ten Bits Ranch' },
+    { pattern: /big bend/i, note: 'Spotty to no signal in Big Bend NP' },
+    { pattern: /santa elena/i, note: 'No signal at Santa Elena Canyon' },
+    { pattern: /boquillas/i, note: 'No signal at Boquillas Canyon' },
+    { pattern: /hot springs/i, note: 'No signal at Hot Springs' },
+    { pattern: /ross maxwell/i, note: 'No signal on Ross Maxwell drive' },
+    { pattern: /lost mine/i, note: 'No signal on Lost Mine Trail' },
+    { pattern: /window trail/i, note: 'No signal on Window Trail' },
+  ];
+  const getCellWarning = (a) => {
+    const hay = [a.title, a.description, a.location?.name].filter(Boolean).join(' ');
+    for (const z of NO_SIGNAL_ZONES) { if (z.pattern.test(hay)) return z.note; }
+    return null;
+  };
+
+  // ---------- Today's essentials ----------
+  const ESSENTIALS_MAP = {
+    hike: ['Water (1qt/hr)', 'Hiking shoes', 'Sunscreen', 'Hat', 'Sunglasses'],
+    experience: [],
+    drive: [],
+    food: [],
+    lodging: [],
+    sightseeing: ['Sunscreen', 'Hat', 'Sunglasses'],
+    activity: ['Sunscreen'],
+    rest: [],
+  };
+  const SPECIAL_ESSENTIALS = [
+    { pattern: /star\s*party|stargazing/i, items: ['Warm jacket', 'Blanket for benches', 'Red flashlight', 'NO white lights'] },
+    { pattern: /hot springs|soak/i, items: ['Towel', 'Headlamp', 'Water shoes'] },
+    { pattern: /swim|balmorhea|pool/i, items: ['Swim gear', 'Snorkel', 'Floats', 'Towel'] },
+    { pattern: /float|canoe|kayak/i, items: ['Sunscreen', 'Water', 'Dry bag'] },
+    { pattern: /observatory/i, items: ['Warm layers (high elevation)'] },
+  ];
+  const todayEssentials = (day) => {
+    const items = new Set();
+    day.activities.filter(a => a.status === 'pending').forEach(a => {
+      (ESSENTIALS_MAP[a.type] || []).forEach(i => items.add(i));
+      const hay = [a.title, a.description].filter(Boolean).join(' ');
+      SPECIAL_ESSENTIALS.forEach(s => { if (s.pattern.test(hay)) s.items.forEach(i => items.add(i)); });
+    });
+    return [...items];
+  };
+
+  // ---------- Drive time estimator ----------
+  const nextDriveLeaveBy = (day) => {
+    const isToday = day.date === todayStr();
+    if (!isToday) return null;
+    const nowMin = currentMinutes();
+    const nextDrive = day.activities.find(a => a.type === 'drive' && a.status === 'pending' && a.duration && parseHM(a.time) > nowMin);
+    if (!nextDrive) return null;
+    const arriveByMin = parseHM(nextDrive.time);
+    const leaveByMin = arriveByMin - (nextDrive.duration || 0);
+    if (leaveByMin <= nowMin) return { activity: nextDrive, label: 'Leave now!', urgent: true };
+    const delta = leaveByMin - nowMin;
+    const leaveTime = `${String(Math.floor(leaveByMin / 60)).padStart(2, '0')}:${String(leaveByMin % 60).padStart(2, '0')}`;
+    return { activity: nextDrive, label: `Leave by ${fmtTime12(leaveTime)}`, delta, urgent: delta < 30 };
+  };
+
+  // ---------- Per-day expenses ----------
+  const dayExpenses = (dayNumber) => {
+    const expenses = getExpenses().filter(e => e.dayNumber === dayNumber);
+    const gas = getGasLog().filter(g => g.dayNumber === dayNumber);
+    const expTotal = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+    const gasTotal = gas.reduce((s, g) => s + (g.total || 0), 0);
+    return { expenses, gas, expTotal, gasTotal, total: expTotal + gasTotal, count: expenses.length + gas.length };
+  };
+
+  // ---------- Bookmarks ----------
+  const toggleBookmark = (actId) => {
+    const found = findActivity(actId);
+    if (!found) return;
+    found.activity.bookmarked = !found.activity.bookmarked;
+    saveTrip();
+  };
+
+  // ---------- Quick recap ----------
+  const generateDayRecap = (day) => {
+    const done = day.activities.filter(a => a.status === 'done');
+    const skipped = day.activities.filter(a => a.status === 'skipped');
+    if (!done.length && !skipped.length) return null;
+    const lines = [`Day ${day.dayNumber}: ${day.title} (${fmtDate(day.date)})\n`];
+    if (done.length) {
+      lines.push(`Completed (${done.length}):`);
+      done.forEach(a => {
+        lines.push(`  ${a.rating ? '★'.repeat(a.rating) + ' ' : ''}${a.title} @ ${fmtTime12(a.time)}${a.notes ? ` — ${a.notes}` : ''}`);
+      });
+    }
+    if (skipped.length) {
+      lines.push(`\nSkipped (${skipped.length}):`);
+      skipped.forEach(a => lines.push(`  ${a.title}`));
+    }
+    const s = daySummary(day);
+    lines.push(`\n${s.miles} mi driven${s.avgRating ? ` | Avg rating: ${s.avgRating}★` : ''}${s.topRated ? ` | Best: ${s.topRated.title}` : ''}`);
+    return lines.join('\n');
+  };
+
   // ---------- Expense log ----------
   const getExpenses = () => {
     if (!state.trip.expenses) state.trip.expenses = [];
@@ -708,6 +807,51 @@
           </div>
         </section>` : ''}
 
+        ${(() => {
+          const essentials = todayEssentials(day);
+          if (!essentials.length || !isToday) return '';
+          return `
+          <section class="bg-surface-container rounded-2xl p-4 space-y-2">
+            <p class="text-xs font-bold uppercase tracking-widest text-on-surface flex items-center gap-2"><span class="material-symbols-outlined text-sm text-primary">backpack</span> Today's Essentials</p>
+            <div class="flex flex-wrap gap-1.5">${essentials.map(i => `<span class="text-[11px] bg-surface-container-low rounded-full px-2.5 py-1 text-on-surface-variant">${h(i)}</span>`).join('')}</div>
+          </section>`;
+        })()}
+
+        ${(() => {
+          const drive = nextDriveLeaveBy(day);
+          if (!drive) return '';
+          return `
+          <section class="bg-surface-container${drive.urgent ? '-lowest' : ''} rounded-2xl p-4 flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl ${drive.urgent ? 'text-error' : 'text-primary'}">directions_car</span>
+            <div class="flex-1">
+              <p class="text-xs font-bold uppercase tracking-widest ${drive.urgent ? 'text-error' : 'text-on-surface'}">${h(drive.label)}</p>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">${h(drive.activity.title)}${drive.activity.distance ? ` — ${h(drive.activity.distance)}` : ''}</p>
+            </div>
+          </section>`;
+        })()}
+
+        ${(() => {
+          if (!nextAct) return '';
+          const addr = (() => {
+            if (nextAct.bookingRef) {
+              const b = trip.bookings.find(b => b.id === nextAct.bookingRef);
+              if (b?.address) return b.address;
+            }
+            return nextAct.location?.address || nextAct.location?.name || null;
+          })();
+          if (!addr) return '';
+          return `
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener"
+             class="block bg-secondary-container rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform">
+            <span class="material-symbols-outlined text-xl text-on-secondary-container">navigation</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-bold uppercase tracking-widest text-on-secondary-container">Navigate to Next</p>
+              <p class="text-[11px] text-on-secondary-container/70 truncate mt-0.5">${h(addr)}</p>
+            </div>
+            <span class="material-symbols-outlined text-on-secondary-container/60">arrow_forward</span>
+          </a>`;
+        })()}
+
         <section class="relative aspect-[5/4] rounded-2xl overflow-hidden ambient-shadow bg-surface-container-high">
           <div class="absolute inset-0 terracotta-glow opacity-80"></div>
           <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/60 to-transparent"></div>
@@ -1016,6 +1160,35 @@
               </div>` : ''}
           </div>`;
         })()}
+
+        <!-- Per-day spending -->
+        ${(() => {
+          const de = dayExpenses(day.dayNumber);
+          if (!de.count) return '';
+          return `
+          <div class="bg-surface-container rounded-2xl p-5 space-y-2">
+            <div class="flex justify-between items-center">
+              <h3 class="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant">Day ${day.dayNumber} Spending</h3>
+              <span class="font-headline font-bold text-sm text-primary">$${de.total.toFixed(0)}</span>
+            </div>
+            ${de.expenses.map(e => `
+              <div class="flex justify-between text-xs text-on-surface-variant"><span>${h(e.description || e.category)}</span><span class="font-semibold text-on-surface">$${(e.amount || 0).toFixed(2)}</span></div>
+            `).join('')}
+            ${de.gas.map(g => `
+              <div class="flex justify-between text-xs text-on-surface-variant"><span>Gas — ${h(g.location || 'Fill-up')}</span><span class="font-semibold text-on-surface">$${(g.total || 0).toFixed(2)}</span></div>
+            `).join('')}
+          </div>`;
+        })()}
+
+        <!-- Share recap -->
+        ${(() => {
+          const recap = generateDayRecap(day);
+          if (!recap) return '';
+          return `
+          <button data-share-recap="${day.dayNumber}" class="w-full py-3 rounded-2xl bg-surface-container text-on-surface-variant font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-sm">share</span> Share Day ${day.dayNumber} Recap
+          </button>`;
+        })()}
       </div>
     `;
   };
@@ -1118,6 +1291,7 @@
               <div class="flex items-center gap-2">
                 ${a.highlight ? `<span class="text-[9px] font-bold uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full">Highlight</span>` : ''}
                 ${isNextUp ? `<span class="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full">Next Up</span>` : ''}
+                <button data-bookmark="${a.id}" class="p-1 ${a.bookmarked ? 'text-primary' : 'text-on-surface-variant/60'} active:scale-90 transition-transform" title="Bookmark"><span class="material-symbols-outlined text-[16px] ${a.bookmarked ? 'fill-icon' : ''}">bookmark</span></button>
                 <button data-share-act="${a.id}" class="p-1 text-on-surface-variant/60 active:scale-90 transition-transform" title="Share"><span class="material-symbols-outlined text-[16px]">share</span></button>
                 ${!done && !skipped ? `<button data-time-shift="${a.id}" class="p-1 text-on-surface-variant/60 active:scale-90 transition-transform" title="Adjust time"><span class="material-symbols-outlined text-[16px]">schedule</span></button>` : ''}
                 ${a.duration ? `<span class="text-[10px] uppercase font-medium text-on-surface-variant">${fmtDuration(a.duration)}</span>` : ''}
@@ -1134,6 +1308,7 @@
                     <span class="material-symbols-outlined text-primary text-sm mt-0.5">priority_high</span>
                     <p class="text-[11px] text-on-surface-variant leading-snug">${h(al)}</p>
                   </div>`).join('')}</div>` : ''}
+                ${(() => { const cw = getCellWarning(a); return cw ? `<div class="mt-2 flex gap-2 items-center bg-surface-container-low rounded-lg p-2"><span class="material-symbols-outlined text-on-surface-variant/60 text-sm">signal_cellular_off</span><p class="text-[11px] text-on-surface-variant/60">${h(cw)}</p></div>` : ''; })()}
                 ${done && a.rating ? `<p class="text-xs text-tertiary mt-2">${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)}${a.notes ? ` — ${h(a.notes)}` : ''}</p>` : ''}
                 ${a.actualLocation ? `<a href="https://www.google.com/maps/search/?api=1&query=${a.actualLocation.lat},${a.actualLocation.lng}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-on-surface-variant/50 mt-1"><span class="material-symbols-outlined text-[12px]">pin_drop</span>${a.actualLocation.lat.toFixed(3)}, ${a.actualLocation.lng.toFixed(3)}</a>` : ''}
 
@@ -1940,6 +2115,27 @@
 
     const timeShift = e.target.closest('[data-time-shift]');
     if (timeShift) { promptTimeShift(timeShift.dataset.timeShift); return; }
+
+    const bookmarkBtn = e.target.closest('[data-bookmark]');
+    if (bookmarkBtn) {
+      toggleBookmark(bookmarkBtn.dataset.bookmark);
+      render();
+      return;
+    }
+
+    const recapBtn = e.target.closest('[data-share-recap]');
+    if (recapBtn) {
+      const dayNum = Number(recapBtn.dataset.shareRecap);
+      const day = state.trip.days.find(d => d.dayNumber === dayNum);
+      if (day) {
+        const txt = generateDayRecap(day);
+        if (txt) {
+          if (navigator.share) navigator.share({ title: `Day ${dayNum} Recap`, text: txt }).catch(() => {});
+          else copyText(txt);
+        }
+      }
+      return;
+    }
 
     const shareAct2 = e.target.closest('[data-share-act]');
     if (shareAct2) {
