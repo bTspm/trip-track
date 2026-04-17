@@ -302,7 +302,7 @@
     contacts: [
       { label: 'Big Bend NP Rangers', phone: '+14324772251', display: '(432) 477-2251' },
       { label: 'Brewster County Sheriff', phone: '+14328372424', display: '(432) 837-2424' },
-      { label: 'Big Bend Regional Medical', phone: '+14328372286', display: '(432) 837-2286', note: 'Alpine, TX — nearest hospital' },
+      { label: 'Big Bend Regional Medical', phone: '+14328372286', display: '(432) 837-2286', note: '2600 N Hwy 118, Alpine, TX 79830' },
       { label: 'Roadside Assistance (Hyundai)', phone: '+18005654052', display: '(800) 565-4052' },
       { label: 'Far Flung Adventures', phone: '+14323712633', display: '(432) 371-2633' },
       { label: 'Poison Control', phone: '+18002221222', display: '(800) 222-1222' },
@@ -585,8 +585,6 @@
     const skipped = a.status === 'skipped';
     const booking = a.bookingRef ? state.trip.bookings.find(b => b.id === a.bookingRef) : null;
     const addr = booking?.address || a.location?.address || a.location?.name;
-    const loc = a.location;
-    const gq = loc?.lat && loc?.lng ? `${loc.lat},${loc.lng}` : addr;
 
     openModal(`
       <div class="space-y-5 max-h-[75vh] overflow-y-auto">
@@ -698,12 +696,12 @@
 
         <!-- Actions -->
         <div class="flex flex-wrap gap-2 pt-1">
-          ${addr || gq ? `
-            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq || addr)}" target="_blank" rel="noopener"
+          ${addr ? `
+            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener"
                class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5">
                <span class="material-symbols-outlined text-sm">map</span> Google
             </a>
-            <a href="https://maps.apple.com/?q=${encodeURIComponent(addr || gq)}" target="_blank" rel="noopener"
+            <a href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener"
                class="flex-1 py-2.5 bg-secondary-container text-on-secondary-container text-xs font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5">
                <span class="material-symbols-outlined text-sm">map</span> Apple
             </a>` : ''}
@@ -1345,18 +1343,15 @@
 
                 ${(() => {
                   const addr = booking?.address || a.location?.address || a.location?.name;
-                  const loc = a.location;
-                  const hasLoc = addr || (loc?.lat && loc?.lng);
+                  const hasLoc = !!addr;
                   if (!hasLoc && !booking?.phone && !booking) return '';
-                  const gq = loc?.lat && loc?.lng ? `${loc.lat},${loc.lng}` : addr;
-                  const aq = addr || (loc?.lat ? `${loc.lat},${loc.lng}` : '');
                   return `<div class="mt-3 flex flex-wrap gap-2">
                     ${hasLoc ? `
-                      <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq)}" target="_blank" rel="noopener"
+                      <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank" rel="noopener"
                          class="py-2 px-3 bg-secondary-container text-on-secondary-container text-[11px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5">
                          <span class="material-symbols-outlined text-sm">map</span> Google
                       </a>
-                      <a href="https://maps.apple.com/?q=${encodeURIComponent(aq)}" target="_blank" rel="noopener"
+                      <a href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener"
                          class="py-2 px-3 bg-secondary-container text-on-secondary-container text-[11px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5">
                          <span class="material-symbols-outlined text-sm">map</span> Apple
                       </a>` : ''}
