@@ -410,6 +410,26 @@ Spending breakdown on each day view.
 - Includes both expense log entries and gas fill-ups for that day number
 - Running total for the day in the header
 
+### 33. Dashboard Quick-Log Buttons
+
+Log gas and expenses directly from the dashboard.
+
+- **Gas** and **Expense** buttons embedded in the Trip Spending card on the dashboard
+- Opens the same modal as the More tab, but accessible without navigating away
+- Spending card always visible (even with $0) to encourage logging
+- Both buttons trigger GPS capture on save
+
+### 34. Trip Calendar View
+
+Compact visual overview of all trip days on the dashboard.
+
+- **5-column grid** showing all trip days
+- Each day shows: date number, day number, progress indicator
+- **Current day** highlighted in terracotta gradient
+- **Progress indicators:** checkmark (all done), dot (in progress), empty dot (not started)
+- **Tap any day** to navigate directly to that day's timeline view
+- Shows at a glance which days are complete and where you are in the trip
+
 ---
 
 ## Design System: Nomad Dusk
