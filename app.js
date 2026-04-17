@@ -213,6 +213,43 @@
     }, 30000);
   };
 
+  // ---------- Weather refresh ----------
+  const WMO_CODES = {
+    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+    45: 'Foggy', 48: 'Depositing rime fog',
+    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
+    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+    71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow',
+    80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
+    95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail'
+  };
+
+  const refreshWeather = async (dayNumber) => {
+    const day = state.trip.days.find(d => d.dayNumber === dayNumber);
+    if (!day) return;
+    toast('Fetching weather…');
+    try {
+      const lat = 29.25, lng = -103.25;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&temperature_unit=fahrenheit&timezone=America/Chicago&start_date=${day.date}&end_date=${day.date}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      const d = data.daily;
+      if (d && d.temperature_2m_max?.length) {
+        day.weather.high = Math.round(d.temperature_2m_max[0]);
+        day.weather.low = Math.round(d.temperature_2m_min[0]);
+        day.weather.rainChance = d.precipitation_probability_max?.[0] || 0;
+        day.weather.condition = WMO_CODES[d.weather_code?.[0]] || day.weather.condition;
+        day.weather.updatedAt = new Date().toISOString();
+        saveTrip();
+        toast('Weather updated');
+        render();
+      }
+    } catch (e) {
+      toast('No signal — using cached weather');
+    }
+  };
+
   // ---------- Photo prompt ----------
   const promptPhoto = (actTitle) => {
     setTimeout(() => {
@@ -496,6 +533,33 @@
           </div>
         </section>
 
+        ${isToday && nextAct ? `
+        <!-- Running Late -->
+        <section class="flex gap-2">
+          <button data-late="15" class="flex-1 py-3 rounded-xl bg-surface-container text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-primary">schedule</span> +15 min
+          </button>
+          <button data-late="30" class="flex-1 py-3 rounded-xl bg-surface-container text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-primary">schedule</span> +30 min
+          </button>
+          <button data-late="60" class="flex-1 py-3 rounded-xl bg-primary-container text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">alarm</span> +1 hr
+          </button>
+        </section>` : ''}
+
+        ${(() => {
+          const hasHike = day.activities.some(a => a.type === 'hike' && a.status === 'pending');
+          if (!hasHike || !isToday) return '';
+          return `
+          <section class="bg-surface-container-lowest rounded-2xl p-4 flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-tertiary">water_drop</span>
+            <div class="flex-1">
+              <p class="text-xs font-bold uppercase tracking-widest text-tertiary">Hydration Reminder</p>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Hiking today — drink 1 quart per hour on the trail. Fill up before you leave.</p>
+            </div>
+          </section>`;
+        })()}
+
         <section class="space-y-5">
           <div class="flex items-center justify-between">
             <h3 class="font-headline text-xl font-bold tracking-tight">${isToday ? "Today's Timeline" : `Day ${day.dayNumber}`}</h3>
@@ -627,11 +691,16 @@
                   <p class="text-on-surface-variant text-xs uppercase tracking-widest">${h(day.weather.condition || '')}</p>
                 </div>
               </div>
-              ${day.weather.rainChance ? `
-                <div class="flex items-center gap-1 text-on-surface-variant">
-                  <span class="material-symbols-outlined text-sm">water_drop</span>
-                  <span class="text-sm font-semibold">${day.weather.rainChance}%</span>
-                </div>` : ''}
+              <div class="flex items-center gap-3">
+                ${day.weather.rainChance ? `
+                  <div class="flex items-center gap-1 text-on-surface-variant">
+                    <span class="material-symbols-outlined text-sm">water_drop</span>
+                    <span class="text-sm font-semibold">${day.weather.rainChance}%</span>
+                  </div>` : ''}
+                <button data-refresh-weather="${day.dayNumber}" class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" title="Refresh weather">
+                  <span class="material-symbols-outlined text-[18px]">refresh</span>
+                </button>
+              </div>
             </div>
             ${SUN_DATA[day.date] ? `
               <div class="flex gap-4 pt-1">
@@ -644,7 +713,23 @@
                   <span>${SUN_DATA[day.date].set}</span>
                 </div>
               </div>` : ''}
+            ${day.weather.updatedAt ? `<p class="text-[10px] text-on-surface-variant/50 pt-1">Updated ${fmtCheckedAt(day.weather.updatedAt)}</p>` : ''}
           </div>` : ''}
+
+        ${(() => {
+          const hikes = day.activities.filter(a => a.type === 'hike' && a.status === 'pending');
+          if (!hikes.length) return '';
+          const totalMi = hikes.reduce((s, a) => s + (parseFloat(String(a.distance || '').replace(/[^\d.]/g, '')) || 0), 0);
+          const quarts = Math.ceil(totalMi * 0.5);
+          return `
+          <div class="bg-surface-container-lowest rounded-2xl p-4 flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-tertiary">water_drop</span>
+            <div class="flex-1">
+              <p class="text-xs font-bold uppercase tracking-widest text-tertiary">Hydration</p>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">${hikes.length} hike${hikes.length > 1 ? 's' : ''} today (~${totalMi.toFixed(1)} mi). Carry at least ${quarts} quart${quarts > 1 ? 's' : ''} of water.</p>
+            </div>
+          </div>`;
+        })()}
 
         <!-- Timeline -->
         <div class="relative">
@@ -1430,6 +1515,22 @@
         const t = $('#fab-note').value;
         if (t.trim()) { addJournalEntry(t); closeModal(); toast('Note saved'); render(); }
       };
+      return;
+    }
+
+    const weatherBtn = e.target.closest('[data-refresh-weather]');
+    if (weatherBtn) { refreshWeather(Number(weatherBtn.dataset.refreshWeather)); return; }
+
+    const lateBtn = e.target.closest('[data-late]');
+    if (lateBtn) {
+      const delta = Number(lateBtn.dataset.late);
+      const dayIdx = currentDayIdx();
+      const day = state.trip.days[dayIdx];
+      const pending = day.activities.filter(a => a.status === 'pending');
+      pending.forEach(a => { a.time = shiftTime(a.time, delta); });
+      saveTrip();
+      toast(`Shifted ${pending.length} activities +${delta} min`);
+      render();
       return;
     }
 
