@@ -994,8 +994,8 @@
           ${nextAct ? `
           <!-- Live countdown -->
           <div class="flex items-center gap-3 px-1">
-            <div class="w-14 h-14 rounded-2xl terracotta-glow flex items-center justify-center ambient-shadow">
-              <span id="countdown-live" class="font-headline font-extrabold text-on-primary-container text-sm">${h(whenLabel)}</span>
+            <div class="min-w-[72px] h-14 px-3 rounded-2xl terracotta-glow flex items-center justify-center ambient-shadow">
+              <span id="countdown-live" class="font-headline font-extrabold text-on-primary-container text-xs text-center whitespace-nowrap">${h(whenLabel)}</span>
             </div>
             <div class="min-w-0">
               <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Next up</p>
