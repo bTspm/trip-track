@@ -342,6 +342,74 @@ Works without internet after first load.
 - **Standalone display** — runs full-screen like a native app when installed
 - **All data in localStorage** — no network needed for any functionality
 
+### 26. Drive Time Estimator
+
+Smart departure reminder on the dashboard.
+
+- Calculates when you need to leave based on the next drive activity's planned arrival time minus its duration
+- Shows "Leave by X:XX" with the destination and distance
+- Turns red/urgent when less than 30 minutes remaining
+- Shows "Leave now!" when you're already past the departure window
+- Only appears for today's pending drive activities
+
+### 27. Cell Service Warnings
+
+Flags activities in known no-signal areas.
+
+- Auto-detects activities in Big Bend NP, Chisos Basin, Ten Bits Ranch, Santa Elena Canyon, Boquillas, Hot Springs, Ross Maxwell, Lost Mine, Window Trail
+- Shows a subtle "No cell service" indicator with signal-off icon on the activity card
+- Reminder to download/screenshot booking info before heading into dead zones
+- Pattern-matched against activity title, description, and location name
+
+### 28. Today's Essentials Card
+
+Auto-generated gear checklist based on today's activity types.
+
+- Appears on dashboard when today has pending activities
+- **Hike days:** Water, hiking shoes, sunscreen, hat, sunglasses
+- **Star Party:** Warm jacket, blanket for benches, red flashlight, NO white lights
+- **Swimming/Balmorhea:** Swim gear, snorkel, floats, towel
+- **Hot Springs:** Towel, headlamp, water shoes
+- **Float/canoe:** Sunscreen, water, dry bag
+- **Observatory:** Warm layers (high elevation)
+- De-duplicated — each item appears once even if multiple activities need it
+
+### 29. Quick Day Recap Share
+
+One-tap shareable summary of the day's activities.
+
+- "Share Day X Recap" button at the bottom of each day view (after activities are completed)
+- Generates formatted text: completed activities with ratings, skipped activities, miles driven, average rating, best-rated
+- Uses native share sheet on mobile (iMessage, WhatsApp, etc.) or copies to clipboard as fallback
+
+### 30. Bookmark Activities
+
+Personal flag to mark activities you want to revisit.
+
+- Bookmark icon on every activity card (top right)
+- Toggle on/off — filled terracotta when bookmarked, muted when not
+- Separate from the "Highlight" tag (which comes from the trip plan)
+- Bookmarks are your own picks — "I want to come back here" or "research this later"
+- Persisted to localStorage and exported with trip JSON
+
+### 31. Navigate to Next
+
+One-tap Google Maps navigation from the dashboard.
+
+- Shows when the next pending activity has an address or location
+- Displays the destination address
+- Taps directly to Google Maps with the address pre-filled
+- Pulls address from booking data or activity location
+
+### 32. Per-Day Expense Total
+
+Spending breakdown on each day view.
+
+- Appears at the bottom of the day view when expenses or gas fill-ups exist for that day
+- Shows each line item with description and amount
+- Includes both expense log entries and gas fill-ups for that day number
+- Running total for the day in the header
+
 ---
 
 ## Design System: Nomad Dusk
