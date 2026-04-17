@@ -127,7 +127,7 @@ window.SEED_TRIP = {
       "subtitle": "Travel Day",
       "weather": { "high": 86, "low": 62, "condition": "Becoming windier and warm", "rainChance": 0 },
       "activities": [
-        { "id": "d1-a1", "time": "15:00", "title": "Depart Kyle", "type": "drive", "description": "Head west on I-35 S \u2192 I-10 W", "location": { "name": "Kyle, TX", "lat": 29.9888, "lng": -97.8772 }, "duration": 420, "distance": "355 miles", "status": "pending" },
+        { "id": "d1-a1", "time": "15:00", "title": "Depart Kyle", "type": "drive", "description": "Head west on I-35 S \u2192 I-10 W", "location": { "name": "Kyle, TX", "address": "293 Independence Dr, Kyle, TX 78640", "lat": 29.9888, "lng": -97.8772 }, "duration": 420, "distance": "355 miles", "status": "pending" },
         { "id": "d1-a2", "time": "17:30", "title": "Dinner stop", "type": "food", "description": "Junction or Ozona \u2014 grab something quick on I-10", "duration": 45, "status": "pending" },
         { "id": "d1-a3", "time": "22:00", "title": "Arrive Marathon", "type": "lodging", "description": "Check into La Loma del Chivo \u2014 The Museum Room", "location": { "name": "La Loma del Chivo", "address": "401 SW 6th St, Marathon, TX 79842", "lat": 30.2087, "lng": -103.2427 }, "bookingRef": "booking-1", "status": "pending" }
       ]
