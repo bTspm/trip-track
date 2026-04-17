@@ -182,11 +182,65 @@
     const { activity } = findActivity(actId);
     const rating = activity.rating || 0;
     const note = activity.notes || '';
-    const alreadyDone = activity.status === 'done';
+    const isDone = activity.status === 'done';
+    const isSkipped = activity.status === 'skipped';
+    const isMarked = isDone || isSkipped;
+
+    if (isMarked) {
+      openModal(`
+        <div class="space-y-5">
+          <div>
+            <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">${isDone ? 'Completed' : 'Skipped'}</p>
+            <h3 class="font-headline font-bold text-xl mt-1">${h(activity.title)}</h3>
+            <p class="text-sm text-on-surface-variant mt-1">${fmtTime12(activity.time)}${activity.duration ? ` • ${fmtDuration(activity.duration)}` : ''}</p>
+            ${isDone && activity.rating ? `<p class="text-sm text-tertiary mt-2">${'★'.repeat(activity.rating)}${'☆'.repeat(5 - activity.rating)}${activity.notes ? ` — ${h(activity.notes)}` : ''}</p>` : ''}
+          </div>
+          <div class="grid gap-3">
+            <button id="btn-reset" class="py-3 rounded-xl bg-surface-container-low text-on-surface font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">undo</span> Reset to Pending
+            </button>
+            ${isDone ? `
+            <button id="btn-edit-memory" class="py-3 rounded-xl bg-surface-container-high text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">edit</span> Edit Rating & Notes
+            </button>` : `
+            <button id="btn-mark-done" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-sm">check</span> Mark Done Instead
+            </button>`}
+            <button id="btn-cancel" class="py-3 text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Cancel</button>
+          </div>
+        </div>
+      `);
+
+      $('#btn-reset').onclick = () => {
+        activity.status = 'pending';
+        activity.checkedAt = null;
+        activity.rating = null;
+        activity.notes = '';
+        saveTrip(); closeModal();
+        toast('Reset to pending');
+        render();
+      };
+      $('#btn-cancel').onclick = closeModal;
+      if (isDone && $('#btn-edit-memory')) {
+        $('#btn-edit-memory').onclick = () => { closeModal(); showRatingModal(actId); };
+      }
+      if (isSkipped && $('#btn-mark-done')) {
+        $('#btn-mark-done').onclick = () => { closeModal(); showRatingModal(actId); };
+      }
+      return;
+    }
+
+    showRatingModal(actId);
+  };
+
+  const showRatingModal = (actId) => {
+    const { activity } = findActivity(actId);
+    const rating = activity.rating || 0;
+    const note = activity.notes || '';
     openModal(`
       <div class="space-y-5">
         <div>
-          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">${alreadyDone ? 'Edit memory' : 'Completing'}</p>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Completing</p>
           <h3 class="font-headline font-bold text-xl mt-1">${h(activity.title)}</h3>
           <p class="text-sm text-on-surface-variant mt-1">${fmtTime12(activity.time)}${activity.duration ? ` • ${fmtDuration(activity.duration)}` : ''}</p>
         </div>
@@ -204,8 +258,8 @@
           <textarea id="note-field" rows="3" placeholder="Quick thought, tip, or photo reminder…" class="w-full bg-surface-container-low text-on-surface p-3 rounded-xl resize-none outline-none focus:ring-2 focus:ring-primary/60">${h(note)}</textarea>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <button id="btn-skip" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">${alreadyDone ? 'Unmark' : 'Skip'}</button>
-          <button id="btn-save" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">${alreadyDone ? 'Save' : 'Mark Done'}</button>
+          <button id="btn-skip" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Skip</button>
+          <button id="btn-save" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">Mark Done</button>
         </div>
       </div>
     `);
@@ -215,7 +269,6 @@
       const btn = e.target.closest('[data-rate]');
       if (!btn) return;
       pickedRating = Number(btn.dataset.rate);
-      // re-render stars only
       $$('#rating-row [data-rate]').forEach(b => {
         const n = Number(b.dataset.rate);
         b.className = `flex-1 h-12 rounded-xl active:scale-95 transition-transform ${n <= pickedRating ? 'terracotta-glow text-on-primary-container' : 'bg-surface-container-highest text-on-surface-variant'}`;
@@ -229,23 +282,15 @@
       activity.checkedAt = new Date().toISOString();
       activity.rating = pickedRating || null;
       activity.notes = $('#note-field').value.trim();
-      saveTrip();
-      closeModal();
-      toast(alreadyDone ? 'Updated' : 'Checked off ✓');
+      saveTrip(); closeModal();
+      toast('Checked off');
       render();
     };
     $('#btn-skip').onclick = () => {
-      if (alreadyDone) {
-        activity.status = 'pending';
-        activity.checkedAt = null;
-        activity.rating = null;
-      } else {
-        activity.status = 'skipped';
-        activity.checkedAt = new Date().toISOString();
-      }
-      saveTrip();
-      closeModal();
-      toast(alreadyDone ? 'Unmarked' : 'Skipped');
+      activity.status = 'skipped';
+      activity.checkedAt = new Date().toISOString();
+      saveTrip(); closeModal();
+      toast('Skipped');
       render();
     };
   };
@@ -466,6 +511,70 @@
     `;
   };
 
+  const fmtCheckedAt = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const hr = ((d.getHours() + 11) % 12) + 1;
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${hr}:${min} ${d.getHours() >= 12 ? 'PM' : 'AM'}`;
+  };
+
+  const shiftTime = (hm, deltaMin) => {
+    let total = parseHM(hm) + deltaMin;
+    if (total < 0) total = 0;
+    if (total >= 1440) total = 1439;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+
+  const promptTimeShift = (actId) => {
+    const found = findActivity(actId);
+    if (!found) return;
+    const { day, activity } = found;
+    const actIdx = day.activities.indexOf(activity);
+    const remaining = day.activities.slice(actIdx);
+
+    openModal(`
+      <div class="space-y-5">
+        <div>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Adjust Time</p>
+          <h3 class="font-headline font-bold text-xl mt-1">${h(activity.title)}</h3>
+          <p class="text-sm text-on-surface-variant mt-1">Currently ${fmtTime12(activity.time)}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-widest text-on-surface-variant font-semibold mb-3">Shift by</p>
+          <div class="grid grid-cols-3 gap-2">
+            ${[-60, -30, -15, 15, 30, 60].map(d => `
+              <button data-shift="${d}" class="py-3 rounded-xl ${d > 0 ? 'bg-surface-container-high' : 'bg-surface-container-low'} text-on-surface font-bold text-sm active:scale-95 transition-transform">
+                ${d > 0 ? '+' : ''}${d} min
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="flex items-center gap-3 pt-1">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="shift-cascade" checked class="w-5 h-5 rounded bg-surface-container-high border-outline-variant accent-primary" />
+            <span class="text-sm text-on-surface-variant">Also shift remaining activities (${remaining.length - 1} more)</span>
+          </label>
+        </div>
+        <button id="btn-shift-cancel" class="w-full py-3 text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Cancel</button>
+      </div>
+    `);
+
+    $$('[data-shift]').forEach(btn => {
+      btn.onclick = () => {
+        const delta = Number(btn.dataset.shift);
+        const cascade = $('#shift-cascade').checked;
+        const toShift = cascade ? remaining : [activity];
+        toShift.forEach(act => { act.time = shiftTime(act.time, delta); });
+        saveTrip(); closeModal();
+        toast(`Shifted ${cascade ? remaining.length + ' activities' : '1 activity'} by ${delta > 0 ? '+' : ''}${delta} min`);
+        render();
+      };
+    });
+
+    $('#btn-shift-cancel').onclick = closeModal;
+  };
+
   const activityCard = (a, isNextUp, day) => {
     const done = a.status === 'done';
     const skipped = a.status === 'skipped';
@@ -485,16 +594,22 @@
       ? 'bg-surface-container-lowest rounded-[15px] p-5'
       : `rounded-2xl p-5 ${done || skipped ? 'bg-surface-container-low' : 'bg-surface-container'}`;
 
+    const doneAtLabel = done && a.checkedAt ? `Done at ${fmtCheckedAt(a.checkedAt)}` : skipped && a.checkedAt ? `Skipped at ${fmtCheckedAt(a.checkedAt)}` : '';
+
     return `
       <div class="relative flex gap-4 mb-6">
         <button class="relative z-10 active:scale-90 transition-transform" data-check="${a.id}" aria-label="Toggle ${h(a.title)}">${circle}</button>
         <div class="flex-1 min-w-0 ${bodyClasses}">
           <div class="${innerClass}">
             <div class="flex justify-between items-start gap-3 mb-2">
-              <span class="text-primary-fixed-dim text-xs font-bold tracking-tight">${fmtTime12(a.time)}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-primary-fixed-dim text-xs font-bold tracking-tight">${fmtTime12(a.time)}</span>
+                ${doneAtLabel ? `<span class="text-[10px] text-tertiary">${doneAtLabel}</span>` : ''}
+              </div>
               <div class="flex items-center gap-2">
                 ${a.highlight ? `<span class="text-[9px] font-bold uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full">Highlight</span>` : ''}
                 ${isNextUp ? `<span class="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full">Next Up</span>` : ''}
+                ${!done && !skipped ? `<button data-time-shift="${a.id}" class="p-1 text-on-surface-variant/60 active:scale-90 transition-transform" title="Adjust time"><span class="material-symbols-outlined text-[16px]">schedule</span></button>` : ''}
                 ${a.duration ? `<span class="text-[10px] uppercase font-medium text-on-surface-variant">${fmtDuration(a.duration)}</span>` : ''}
               </div>
             </div>
@@ -1023,6 +1138,9 @@
 
     const copyBtn = e.target.closest('[data-copy]');
     if (copyBtn) { copyText(copyBtn.dataset.copy); return; }
+
+    const timeShift = e.target.closest('[data-time-shift]');
+    if (timeShift) { promptTimeShift(timeShift.dataset.timeShift); return; }
 
     const checkBtn = e.target.closest('[data-check]');
     if (checkBtn) { promptCheckoff(checkBtn.dataset.check); return; }
