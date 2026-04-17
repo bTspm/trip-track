@@ -280,7 +280,59 @@ JSON-based data portability.
 - **Import** — upload a trip JSON file to replace current trip data. Validates that the file has a `days` array.
 - **Reset** — restores the original seed trip data (with confirmation prompt)
 
-### 20. PWA & Offline Support
+### 20. Swipe Between Days
+
+Touch gesture navigation on the day view.
+
+- **Swipe left** — go to next day
+- **Swipe right** — go to previous day
+- Requires minimum 80px horizontal swipe with horizontal intent (vertical scroll doesn't trigger)
+- Works alongside the day picker pills for tap navigation
+- Passive touch listeners for smooth scroll performance
+
+### 21. Expanded Trip Stats
+
+Rich statistics on the dashboard progress card.
+
+- **Base stats:** day X/Y, activities done/total, miles driven
+- **Extended stats (appear once activities are completed):** hikes completed, total elevation gained (ft), total driving hours
+- **Best-rated activity** — highlighted with star icon and rating
+- All calculated from actual check-off data, not planned
+
+### 22. Collapse Completed Activities
+
+Toggle to hide done/skipped items on the day view.
+
+- **Toggle button** appears when any activities are completed or skipped
+- Hides all done and skipped activities, showing only pending ones
+- Useful mid-day when you only want to see what's ahead
+- Toggle persists during session (resets on page reload)
+- Button shows "Hide completed" / "Show completed" with eye icon
+
+### 23. Quick Expense Log
+
+Track spending beyond gas across the trip.
+
+- **Categories:** food, park fee, souvenir, gas, tip, other — tap to select
+- **Fields:** description, amount, category
+- **GPS capture** on each entry
+- **Running totals** — total spend, item count, breakdown by category
+- **Chronological log** with delete option
+- Located in More tab alongside gas tracker
+- Exported with trip JSON for post-trip budget analysis
+
+### 24. Dark/Light Mode Toggle
+
+Switch between dark desert mode and bright daylight mode.
+
+- **Toggle button** in top-right header (sun/moon icon)
+- **Dark mode** (default) — #131313 background, optimized for nighttime/stargazing
+- **Light mode** — #f5f0eb warm sand background, optimized for bright desert sun
+- Persists choice in localStorage across sessions
+- Updates theme-color meta tag for native mobile browser chrome
+- Light mode overrides surface colors, text colors, shadows, and overlay backgrounds
+
+### 25. PWA & Offline Support
 
 Works without internet after first load.
 
