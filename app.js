@@ -749,6 +749,40 @@
           ${stats.bestRated ? `<div class="bg-surface-container-low rounded-xl p-3 flex items-center gap-2"><span class="material-symbols-outlined text-tertiary fill-icon text-sm">star</span><span class="text-xs text-on-surface-variant">Best: <span class="text-on-surface font-semibold">${h(stats.bestRated.title)}</span> (${stats.bestRated.rating}★)</span></div>` : ''}` : ''}
         </section>
 
+        <!-- Trip Spending -->
+        ${(() => {
+          const bookingTotal = trip.bookings.reduce((s, b) => s + (b.cost || 0), 0);
+          const gs = gasStats();
+          const es = expenseStats();
+          const grandTotal = bookingTotal + gs.cost + es.total;
+          if (!grandTotal) return '';
+          return `
+          <section class="bg-surface-container rounded-2xl p-5 space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold uppercase tracking-widest text-on-surface">Trip Spending</span>
+              <span class="font-headline text-sm font-extrabold text-primary">$${grandTotal.toFixed(0)}</span>
+            </div>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-on-surface-variant flex items-center gap-2"><span class="material-symbols-outlined text-sm">hotel</span> Bookings</span>
+                <span class="text-sm font-semibold">$${bookingTotal.toFixed(0)}</span>
+              </div>
+              ${gs.cost ? `<div class="flex justify-between items-center">
+                <span class="text-sm text-on-surface-variant flex items-center gap-2"><span class="material-symbols-outlined text-sm">local_gas_station</span> Gas (${gs.count} stops)</span>
+                <span class="text-sm font-semibold">$${gs.cost.toFixed(0)}</span>
+              </div>` : ''}
+              ${es.total ? `<div class="flex justify-between items-center">
+                <span class="text-sm text-on-surface-variant flex items-center gap-2"><span class="material-symbols-outlined text-sm">receipt</span> Expenses (${es.count})</span>
+                <span class="text-sm font-semibold">$${es.total.toFixed(0)}</span>
+              </div>` : ''}
+              ${es.total && Object.keys(es.byCategory).length ? `
+              <div class="flex flex-wrap gap-1.5 pt-1">
+                ${Object.entries(es.byCategory).map(([k, v]) => `<span class="text-[10px] bg-surface-container-low rounded-full px-2 py-0.5 text-on-surface-variant">${h(k)} $${v.toFixed(0)}</span>`).join('')}
+              </div>` : ''}
+            </div>
+          </section>`;
+        })()}
+
         ${isToday && nextAct ? `
         <!-- Running Late -->
         <section class="flex gap-2">
