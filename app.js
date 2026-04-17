@@ -2018,28 +2018,6 @@
     }
   });
 
-  // ---------- Swipe between days ----------
-  let touchStartX = 0, touchStartY = 0;
-  document.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    const route = parseRoute();
-    if (route.name !== 'day') return;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
-    const current = route.day || state.trip.days[currentDayIdx()].dayNumber;
-    const idx = state.trip.days.findIndex(d => d.dayNumber === current);
-    if (dx < 0 && idx < state.trip.days.length - 1) {
-      location.hash = `#/day/${state.trip.days[idx + 1].dayNumber}`;
-    } else if (dx > 0 && idx > 0) {
-      location.hash = `#/day/${state.trip.days[idx - 1].dayNumber}`;
-    }
-  }, { passive: true });
-
   // ---------- Dark/light mode ----------
   const getTheme = () => localStorage.getItem('tripdna.theme') || 'dark';
   const applyTheme = (theme) => {
