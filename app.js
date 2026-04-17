@@ -82,6 +82,76 @@
     return state.trip.days.length - 1;
   };
 
+  const todayAlerts = () => {
+    const dayIdx = currentDayIdx();
+    const day = state.trip.days[dayIdx];
+    const alerts = [];
+    for (const a of day.activities) {
+      if (a.status === 'done' || a.status === 'skipped') continue;
+      if (a.alerts?.length) {
+        for (const al of a.alerts) alerts.push({ text: al, time: a.time, title: a.title, id: a.id });
+      }
+    }
+    return alerts;
+  };
+
+  const getJournal = () => {
+    if (!state.trip.journal) state.trip.journal = [];
+    return state.trip.journal;
+  };
+
+  const addJournalEntry = (text) => {
+    if (!text.trim()) return;
+    getJournal().push({ id: `j-${Date.now()}`, text: text.trim(), createdAt: new Date().toISOString(), dayNumber: state.trip.days[currentDayIdx()]?.dayNumber || null });
+    saveTrip();
+  };
+
+  const deleteJournalEntry = (id) => {
+    const j = getJournal();
+    const idx = j.findIndex(e => e.id === id);
+    if (idx !== -1) { j.splice(idx, 1); saveTrip(); }
+  };
+
+  const activityToText = (a, day) => {
+    const parts = [`${a.title}`, `${fmtTime12(a.time)}${a.duration ? ` (${fmtDuration(a.duration)})` : ''}`];
+    if (a.description) parts.push(a.description);
+    if (a.distance) parts.push(`Distance: ${a.distance}${a.difficulty ? ` • ${a.difficulty}` : ''}${a.elevationGain ? ` • +${a.elevationGain} ft` : ''}`);
+    if (a.bookingRef) {
+      const b = state.trip.bookings.find(b => b.id === a.bookingRef);
+      if (b) {
+        if (b.confirmationNumber) parts.push(`Confirmation: ${b.confirmationNumber}`);
+        if (b.address) parts.push(`Address: ${b.address}`);
+        if (b.phone) parts.push(`Phone: ${b.phone}`);
+      }
+    }
+    if (a.alerts?.length) parts.push(`\u26a0\ufe0f ${a.alerts.join(' | ')}`);
+    if (day) parts.unshift(`Day ${day.dayNumber} \u2022 ${fmtDate(day.date)}`);
+    return parts.join('\n');
+  };
+
+  // ---------- Live countdown ----------
+  let countdownInterval;
+  const startCountdown = () => {
+    clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      const el = $('#countdown-live');
+      if (!el) return;
+      const route = parseRoute();
+      if (route.name !== 'home') return;
+      const dayIdx = currentDayIdx();
+      const day = state.trip.days[dayIdx];
+      const isToday = day.date === todayStr();
+      if (!isToday) return;
+      const nowMin = currentMinutes();
+      const next = day.activities.find(a => a.status === 'pending' && parseHM(a.time) >= nowMin);
+      if (!next) { el.textContent = ''; return; }
+      const delta = parseHM(next.time) - nowMin;
+      if (delta <= 0) el.textContent = 'Now';
+      else if (delta < 60) el.textContent = `${delta}m`;
+      else el.textContent = `${Math.floor(delta / 60)}h ${delta % 60}m`;
+    }, 30000);
+  };
+
   // ---------- Toast ----------
   let toastTimer;
   const toast = (msg) => {
@@ -212,6 +282,9 @@
       else whenLabel = `In ${Math.floor(delta / 60)}h ${delta % 60}m`;
     }
 
+    const alerts = todayAlerts();
+    startCountdown();
+
     return `
       <div class="fade-in space-y-8">
         <section class="space-y-1 pt-2">
@@ -219,6 +292,32 @@
           <h2 class="font-headline text-4xl font-extrabold tracking-tight leading-none">${h(trip.title)}</h2>
           <p class="text-on-surface-variant text-xs mt-2">${h(trip.subtitle)}</p>
         </section>
+
+        <!-- Search bar -->
+        <button id="home-search" class="w-full flex items-center gap-3 bg-surface-container rounded-2xl px-4 py-3.5 active:scale-[0.99] transition-transform">
+          <span class="material-symbols-outlined text-on-surface-variant">search</span>
+          <span class="text-sm text-on-surface-variant/60">Search activities, bookings, packing…</span>
+        </button>
+
+        ${alerts.length ? `
+        <!-- Alerts banner -->
+        <section class="bg-surface-container-lowest rounded-2xl overflow-hidden">
+          <div class="flex items-center gap-2 px-5 pt-4 pb-2">
+            <span class="material-symbols-outlined text-primary text-lg fill-icon">warning</span>
+            <p class="text-xs font-bold uppercase tracking-widest text-primary">Today's Alerts (${alerts.length})</p>
+          </div>
+          <div class="px-5 pb-4 space-y-2">
+            ${alerts.map(al => `
+              <button data-alert-act="${al.id}" class="w-full text-left flex gap-3 p-3 rounded-xl bg-surface-container-low active:scale-[0.99] transition-transform">
+                <span class="material-symbols-outlined text-primary text-sm mt-0.5">priority_high</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[11px] text-on-surface-variant leading-snug">${h(al.text)}</p>
+                  <p class="text-[10px] text-on-surface-variant/60 mt-1">${h(al.title)} • ${fmtTime12(al.time)}</p>
+                </div>
+              </button>
+            `).join('')}
+          </div>
+        </section>` : ''}
 
         <section class="relative aspect-[5/4] rounded-2xl overflow-hidden ambient-shadow bg-surface-container-high">
           <div class="absolute inset-0 terracotta-glow opacity-80"></div>
@@ -260,8 +359,21 @@
             <a href="#/day/${day.dayNumber}" class="text-primary text-xs font-bold uppercase tracking-widest flex items-center gap-1">View Day <span class="material-symbols-outlined text-sm">arrow_forward</span></a>
           </div>
 
+          ${nextAct ? `
+          <!-- Live countdown -->
+          <div class="flex items-center gap-3 px-1">
+            <div class="w-14 h-14 rounded-2xl terracotta-glow flex items-center justify-center ambient-shadow">
+              <span id="countdown-live" class="font-headline font-extrabold text-on-primary-container text-sm">${h(whenLabel)}</span>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Next up</p>
+              <p class="font-headline font-bold text-sm truncate">${h(nextAct.title)}</p>
+              <p class="text-xs text-on-surface-variant">${fmtTime12(nextAct.time)}</p>
+            </div>
+          </div>` : ''}
+
           ${prevAct ? homeMiniCard(prevAct, 'done') : ''}
-          ${nextAct ? homeNextCard(nextAct, whenLabel) : `<div class="bg-surface-container rounded-2xl p-5 text-center text-on-surface-variant text-sm">${postTrip ? 'Trip complete — open More to export your memories.' : 'All activities checked off for today 🌵'}</div>`}
+          ${nextAct ? homeNextCard(nextAct, whenLabel) : `<div class="bg-surface-container rounded-2xl p-5 text-center text-on-surface-variant text-sm">${postTrip ? 'Trip complete — open More to export your memories.' : 'All activities checked off for today'}</div>`}
           ${afterAct ? homeMiniCard(afterAct, 'later') : ''}
         </section>
       </div>
@@ -868,8 +980,15 @@
 
   // ---------- Event delegation ----------
   document.addEventListener('click', (e) => {
-    if (e.target.closest('#btn-search')) { openSearch(); return; }
+    if (e.target.closest('#btn-search') || e.target.closest('#home-search')) { openSearch(); return; }
     if (e.target.closest('#search-close')) { closeSearch(); return; }
+
+    const alertAct = e.target.closest('[data-alert-act]');
+    if (alertAct) {
+      const { day } = findActivity(alertAct.dataset.alertAct);
+      location.hash = `#/day/${day.dayNumber}`;
+      return;
+    }
 
     const chip = e.target.closest('[data-search-chip]');
     if (chip) {
