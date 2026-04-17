@@ -100,9 +100,10 @@
     return state.trip.journal;
   };
 
-  const addJournalEntry = (text) => {
+  const addJournalEntry = async (text) => {
     if (!text.trim()) return;
-    getJournal().push({ id: `j-${Date.now()}`, text: text.trim(), createdAt: new Date().toISOString(), dayNumber: state.trip.days[currentDayIdx()]?.dayNumber || null });
+    const geo = await getLocation();
+    getJournal().push({ id: `j-${Date.now()}`, text: text.trim(), createdAt: new Date().toISOString(), dayNumber: state.trip.days[currentDayIdx()]?.dayNumber || null, geo });
     saveTrip();
   };
 
@@ -212,6 +213,16 @@
       else el.textContent = `${Math.floor(delta / 60)}h ${delta % 60}m`;
     }, 30000);
   };
+
+  // ---------- Geolocation ----------
+  const getLocation = () => new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: Math.round(pos.coords.latitude * 100000) / 100000, lng: Math.round(pos.coords.longitude * 100000) / 100000 }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+    );
+  });
 
   // ---------- Weather refresh ----------
   const WMO_CODES = {
@@ -407,7 +418,7 @@
       });
     });
 
-    $('#btn-save').onclick = () => {
+    $('#btn-save').onclick = async () => {
       const timeVal = $('#done-time').value;
       const [dh, dm] = timeVal.split(':').map(Number);
       const checkedDate = new Date();
@@ -416,14 +427,18 @@
       activity.checkedAt = checkedDate.toISOString();
       activity.rating = pickedRating || null;
       activity.notes = $('#note-field').value.trim();
+      const loc = await getLocation();
+      if (loc) activity.actualLocation = loc;
       saveTrip(); closeModal();
       toast('Checked off');
       render();
       promptPhoto(activity.title);
     };
-    $('#btn-skip').onclick = () => {
+    $('#btn-skip').onclick = async () => {
       activity.status = 'skipped';
       activity.checkedAt = new Date().toISOString();
+      const loc = await getLocation();
+      if (loc) activity.actualLocation = loc;
       saveTrip(); closeModal();
       toast('Skipped');
       render();
@@ -876,6 +891,7 @@
                     <p class="text-[11px] text-on-surface-variant leading-snug">${h(al)}</p>
                   </div>`).join('')}</div>` : ''}
                 ${done && a.rating ? `<p class="text-xs text-tertiary mt-2">${'★'.repeat(a.rating)}${'☆'.repeat(5 - a.rating)}${a.notes ? ` — ${h(a.notes)}` : ''}</p>` : ''}
+                ${a.actualLocation ? `<a href="https://www.google.com/maps/search/?api=1&query=${a.actualLocation.lat},${a.actualLocation.lng}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-on-surface-variant/50 mt-1"><span class="material-symbols-outlined text-[12px]">pin_drop</span>${a.actualLocation.lat.toFixed(3)}, ${a.actualLocation.lng.toFixed(3)}</a>` : ''}
 
                 ${(() => {
                   const addr = booking?.address || a.location?.address || a.location?.name;
@@ -1088,7 +1104,7 @@
                   <span class="material-symbols-outlined text-primary text-sm mt-0.5">edit_note</span>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm">${h(e.text)}</p>
-                    <p class="text-[10px] text-on-surface-variant mt-1">Day ${e.dayNumber || '?'} • ${fmtCheckedAt(e.createdAt)}</p>
+                    <p class="text-[10px] text-on-surface-variant mt-1">Day ${e.dayNumber || '?'} • ${fmtCheckedAt(e.createdAt)}${e.geo ? ` • <a href="https://www.google.com/maps/search/?api=1&query=${e.geo.lat},${e.geo.lng}" target="_blank" rel="noopener" class="text-primary/60">📍</a>` : ''}</p>
                   </div>
                   <button data-del-journal="${e.id}" class="p-1 text-on-surface-variant/40 active:scale-90 transition-transform">
                     <span class="material-symbols-outlined text-sm">close</span>
@@ -1118,7 +1134,7 @@
                   <span class="material-symbols-outlined text-on-surface-variant">local_gas_station</span>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold">${h(e.location || 'Fill-up')}</p>
-                    <p class="text-[10px] text-on-surface-variant">${e.gallons ? e.gallons + ' gal' : ''}${e.pricePerGal ? ` @ $${e.pricePerGal}/gal` : ''} • Day ${e.dayNumber || '?'}</p>
+                    <p class="text-[10px] text-on-surface-variant">${e.gallons ? e.gallons + ' gal' : ''}${e.pricePerGal ? ` @ $${e.pricePerGal}/gal` : ''} • Day ${e.dayNumber || '?'}${e.geo ? ` • <a href="https://www.google.com/maps/search/?api=1&query=${e.geo.lat},${e.geo.lng}" target="_blank" rel="noopener" class="text-primary/60">📍</a>` : ''}</p>
                   </div>
                   <span class="text-sm font-bold text-on-surface">$${(e.total || 0).toFixed(2)}</span>
                   <button data-del-gas="${e.id}" class="p-1 text-on-surface-variant/40 active:scale-90 transition-transform">
@@ -1271,13 +1287,14 @@
     ppgInp.addEventListener('input', autoCalc);
 
     $('#gas-cancel').onclick = closeModal;
-    $('#gas-save').onclick = () => {
+    $('#gas-save').onclick = async () => {
       const gallons = parseFloat(galInp.value) || 0;
       const pricePerGal = parseFloat(ppgInp.value) || 0;
       const total = parseFloat(totInp.value) || (gallons * pricePerGal);
       const location = $('#gas-location').value.trim();
       if (!total && !gallons) { toast('Enter gallons or total'); return; }
-      addGasEntry({ location, gallons, pricePerGal, total });
+      const geo = await getLocation();
+      addGasEntry({ location, gallons, pricePerGal, total, geo });
       closeModal();
       toast('Fill-up logged');
       render();
@@ -1495,7 +1512,7 @@
   };
 
   // ---------- Event delegation ----------
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
     if (e.target.closest('#fab-journal')) {
       openModal(`
         <div class="space-y-4">
@@ -1511,9 +1528,9 @@
         </div>
       `);
       $('#fab-cancel').onclick = closeModal;
-      $('#fab-save').onclick = () => {
+      $('#fab-save').onclick = async () => {
         const t = $('#fab-note').value;
-        if (t.trim()) { addJournalEntry(t); closeModal(); toast('Note saved'); render(); }
+        if (t.trim()) { await addJournalEntry(t); closeModal(); toast('Note saved'); render(); }
       };
       return;
     }
@@ -1617,7 +1634,7 @@
 
     if (e.target.closest('#btn-journal-add')) {
       const inp = $('#journal-input');
-      if (inp && inp.value.trim()) { addJournalEntry(inp.value); render(); }
+      if (inp && inp.value.trim()) { await addJournalEntry(inp.value); render(); }
       return;
     }
 
@@ -1645,10 +1662,10 @@
     }
   });
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', async (e) => {
     if (e.key === 'Escape' && !$('#search-overlay').classList.contains('hidden')) closeSearch();
     if (e.key === 'Enter' && e.target.id === 'journal-input') {
-      if (e.target.value.trim()) { addJournalEntry(e.target.value); render(); }
+      if (e.target.value.trim()) { await addJournalEntry(e.target.value); render(); }
     }
   });
 
