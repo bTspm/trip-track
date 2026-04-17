@@ -70,6 +70,22 @@
     /* safe-area for iOS */
     .pb-nav { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
     .nav-bottom { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+    /* Light mode overrides */
+    html:not(.dark) body { background: #f5f0eb; color: #1c1b1b; }
+    html:not(.dark) .bg-background { background: #f5f0eb; }
+    html:not(.dark) .bg-surface { background: #f5f0eb; }
+    html:not(.dark) .bg-surface-container { background: #e8e0d8; }
+    html:not(.dark) .bg-surface-container-low { background: #f0e8e0; }
+    html:not(.dark) .bg-surface-container-high { background: #ddd5cc; }
+    html:not(.dark) .bg-surface-container-highest { background: #d0c8c0; }
+    html:not(.dark) .bg-surface-container-lowest { background: #f5f0eb; }
+    html:not(.dark) .text-on-surface { color: #1c1b1b; }
+    html:not(.dark) .text-on-surface-variant { color: #56423a; }
+    html:not(.dark) .text-on-background { color: #1c1b1b; }
+    html:not(.dark) .bg-background\/70, html:not(.dark) header { background: rgba(245,240,235,0.7) !important; }
+    html:not(.dark) .bg-surface-container\/80, html:not(.dark) nav.fixed { background: rgba(232,224,216,0.8) !important; }
+    html:not(.dark) .ambient-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+    html:not(.dark) #search-overlay { background: #f5f0eb; }
   </style>
 </head>
 <body class="bg-background text-on-background">
@@ -81,6 +97,9 @@
       <h1 class="text-primary font-headline font-extrabold tracking-widest uppercase text-lg">TripDNA</h1>
     </div>
     <div id="top-right" class="flex items-center gap-2">
+      <button id="btn-theme" class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" aria-label="Toggle theme">
+        <span class="material-symbols-outlined text-[20px]">light_mode</span>
+      </button>
       <button id="btn-search" class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" aria-label="Search">
         <span class="material-symbols-outlined text-[20px]">search</span>
       </button>

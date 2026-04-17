@@ -13,7 +13,7 @@
     return t;
   };
   const saveTrip = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trip));
-  const state = { trip: loadTrip() };
+  const state = { trip: loadTrip(), hideCompleted: false };
 
   // ---------- Helpers ----------
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -67,11 +67,20 @@
   };
   const tripStats = () => {
     const acts = allActivities();
-    const done = acts.filter(a => a.status === 'done').length;
-    const miles = acts
-      .filter(a => a.status === 'done' && a.distance)
+    const doneActs = acts.filter(a => a.status === 'done');
+    const done = doneActs.length;
+    const miles = doneActs
+      .filter(a => a.distance)
       .reduce((s, a) => s + (parseFloat(String(a.distance).replace(/[^\d.]/g, '')) || 0), 0);
-    return { total: acts.length, done, pct: acts.length ? Math.round(done / acts.length * 100) : 0, miles: Math.round(miles) };
+    const elevation = doneActs
+      .filter(a => a.elevationGain)
+      .reduce((s, a) => s + (a.elevationGain || 0), 0);
+    const hikesCompleted = doneActs.filter(a => a.type === 'hike').length;
+    const driveMinutes = doneActs
+      .filter(a => a.type === 'drive' && a.duration)
+      .reduce((s, a) => s + (a.duration || 0), 0);
+    const bestRated = doneActs.filter(a => a.rating).sort((a, b) => b.rating - a.rating)[0] || null;
+    return { total: acts.length, done, pct: acts.length ? Math.round(done / acts.length * 100) : 0, miles: Math.round(miles), elevation, hikesCompleted, driveHours: Math.round(driveMinutes / 60 * 10) / 10, bestRated };
   };
 
   const currentDayIdx = () => {
@@ -150,6 +159,29 @@
     const totalCost = log.reduce((s, e) => s + (e.total || 0), 0);
     return { count: log.length, gallons: Math.round(totalGal * 10) / 10, cost: Math.round(totalCost * 100) / 100 };
   };
+
+  // ---------- Expense log ----------
+  const getExpenses = () => {
+    if (!state.trip.expenses) state.trip.expenses = [];
+    return state.trip.expenses;
+  };
+  const addExpenseEntry = (entry) => {
+    getExpenses().push({ id: `e-${Date.now()}`, ...entry, createdAt: new Date().toISOString(), dayNumber: state.trip.days[currentDayIdx()]?.dayNumber || null });
+    saveTrip();
+  };
+  const deleteExpenseEntry = (id) => {
+    const e = getExpenses();
+    const idx = e.findIndex(x => x.id === id);
+    if (idx !== -1) { e.splice(idx, 1); saveTrip(); }
+  };
+  const expenseStats = () => {
+    const log = getExpenses();
+    const total = log.reduce((s, e) => s + (e.amount || 0), 0);
+    const byCategory = {};
+    log.forEach(e => { byCategory[e.category || 'other'] = (byCategory[e.category || 'other'] || 0) + (e.amount || 0); });
+    return { count: log.length, total: Math.round(total * 100) / 100, byCategory };
+  };
+  const EXPENSE_CATEGORIES = ['food', 'park fee', 'souvenir', 'gas', 'tip', 'other'];
 
   // ---------- Sunrise/Sunset ----------
   const SUN_DATA = {
@@ -708,6 +740,13 @@
             <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Done</p><p class="font-headline text-lg font-bold">${stats.done}<span class="text-xs font-normal text-on-surface-variant"> / ${stats.total}</span></p></div>
             <div class="text-right"><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Driven</p><p class="font-headline text-lg font-bold">${stats.miles}<span class="text-xs font-normal text-on-surface-variant"> mi</span></p></div>
           </div>
+          ${stats.done > 0 ? `
+          <div class="grid grid-cols-3 gap-4 pt-1 border-t border-outline-variant/10">
+            <div class="pt-2"><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Hikes</p><p class="font-headline text-lg font-bold">${stats.hikesCompleted}</p></div>
+            <div class="pt-2"><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Elevation</p><p class="font-headline text-lg font-bold">${stats.elevation}<span class="text-xs font-normal text-on-surface-variant"> ft</span></p></div>
+            <div class="pt-2 text-right"><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Drive</p><p class="font-headline text-lg font-bold">${stats.driveHours}<span class="text-xs font-normal text-on-surface-variant"> hrs</span></p></div>
+          </div>
+          ${stats.bestRated ? `<div class="bg-surface-container-low rounded-xl p-3 flex items-center gap-2"><span class="material-symbols-outlined text-tertiary fill-icon text-sm">star</span><span class="text-xs text-on-surface-variant">Best: <span class="text-on-surface font-semibold">${h(stats.bestRated.title)}</span> (${stats.bestRated.rating}★)</span></div>` : ''}` : ''}
         </section>
 
         ${isToday && nextAct ? `
@@ -908,10 +947,19 @@
           </div>`;
         })()}
 
+        <!-- Collapse toggle -->
+        ${day.activities.some(a => a.status === 'done' || a.status === 'skipped') ? `
+        <button id="btn-collapse" class="flex items-center gap-2 text-xs text-on-surface-variant uppercase tracking-widest font-bold active:scale-95 transition-transform">
+          <span class="material-symbols-outlined text-sm">${state.hideCompleted ? 'visibility' : 'visibility_off'}</span>
+          ${state.hideCompleted ? 'Show completed' : 'Hide completed'}
+        </button>` : ''}
+
         <!-- Timeline -->
-        <div class="relative">
+        <div id="day-timeline" class="relative" data-day="${day.dayNumber}">
           <div class="absolute left-[27px] top-4 bottom-4 w-[2px] bg-surface-container-highest"></div>
-          ${day.activities.map((a, i) => activityCard(a, i === firstPendingIdx, day)).join('')}
+          ${day.activities
+            .filter(a => state.hideCompleted ? (a.status !== 'done' && a.status !== 'skipped') : true)
+            .map((a) => activityCard(a, day.activities.indexOf(a) === firstPendingIdx, day)).join('')}
         </div>
 
         <!-- Day Summary -->
@@ -1307,6 +1355,42 @@
             </div>` : `<p class="text-xs text-on-surface-variant">Log fill-ups to track fuel spend across the trip.</p>`}
         </section>
 
+        <!-- Expenses -->
+        <section class="bg-surface-container rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-headline font-bold text-lg">Expenses</h3>
+            <button id="btn-expense-add" class="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-xs font-bold uppercase tracking-widest active:scale-95 transition-transform flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add</span> Add
+            </button>
+          </div>
+          ${(() => {
+            const es = expenseStats();
+            const expenses = getExpenses();
+            if (!es.count) return `<p class="text-xs text-on-surface-variant">Track food, souvenirs, park fees, tips.</p>`;
+            return `
+              <div class="grid grid-cols-2 gap-3">
+                <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Total</p><p class="font-headline font-bold text-lg">$${es.total.toFixed(0)}</p></div>
+                <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Items</p><p class="font-headline font-bold text-lg">${es.count}</p></div>
+              </div>
+              ${Object.keys(es.byCategory).length ? `<div class="flex flex-wrap gap-2">${Object.entries(es.byCategory).map(([k, v]) => `<span class="text-[10px] bg-surface-container-low rounded-full px-2 py-1 text-on-surface-variant">${h(k)}: $${v.toFixed(0)}</span>`).join('')}</div>` : ''}
+              <div class="space-y-2 pt-1">
+                ${[...expenses].reverse().map(e => `
+                  <div class="flex gap-3 items-center bg-surface-container-low rounded-xl p-3">
+                    <span class="material-symbols-outlined text-on-surface-variant">receipt</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold">${h(e.description || e.category)}</p>
+                      <p class="text-[10px] text-on-surface-variant">${h(e.category)} • Day ${e.dayNumber || '?'}${e.geo ? ` • <a href="https://www.google.com/maps/search/?api=1&query=${e.geo.lat},${e.geo.lng}" target="_blank" rel="noopener" class="text-primary/60">📍</a>` : ''}</p>
+                    </div>
+                    <span class="text-sm font-bold text-on-surface">$${(e.amount || 0).toFixed(2)}</span>
+                    <button data-del-expense="${e.id}" class="p-1 text-on-surface-variant/40 active:scale-90 transition-transform">
+                      <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                `).join('')}
+              </div>`;
+          })()}
+        </section>
+
         <!-- Packing -->
         <section class="bg-surface-container rounded-2xl p-5 space-y-3">
           <div class="flex items-center justify-between">
@@ -1459,6 +1543,50 @@
       addGasEntry({ location, gallons, pricePerGal, total, geo });
       closeModal();
       toast('Fill-up logged');
+      render();
+    };
+  };
+
+  const promptExpenseEntry = () => {
+    openModal(`
+      <div class="space-y-4">
+        <div>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Log Expense</p>
+          <h3 class="font-headline font-bold text-xl mt-1">Quick Expense</h3>
+        </div>
+        <input id="exp-desc" type="text" placeholder="What was it? (e.g. Lunch at Reata)" class="w-full bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+        <input id="exp-amount" type="number" step="0.01" placeholder="Amount ($)" class="w-full bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+        <div class="flex flex-wrap gap-2">
+          ${EXPENSE_CATEGORIES.map((c, i) => `
+            <button data-exp-cat="${c}" class="px-3 py-1.5 rounded-full text-[11px] uppercase tracking-widest font-bold ${i === 0 ? 'terracotta-glow text-on-primary-container' : 'bg-surface-container text-on-surface-variant'} active:scale-95 transition-transform">${c}</button>
+          `).join('')}
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button id="exp-cancel" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Cancel</button>
+          <button id="exp-save" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">Save</button>
+        </div>
+      </div>
+    `);
+
+    let selectedCat = EXPENSE_CATEGORIES[0];
+    $$('[data-exp-cat]').forEach(btn => {
+      btn.onclick = () => {
+        selectedCat = btn.dataset.expCat;
+        $$('[data-exp-cat]').forEach(b => {
+          b.className = `px-3 py-1.5 rounded-full text-[11px] uppercase tracking-widest font-bold active:scale-95 transition-transform ${b.dataset.expCat === selectedCat ? 'terracotta-glow text-on-primary-container' : 'bg-surface-container text-on-surface-variant'}`;
+        });
+      };
+    });
+
+    $('#exp-cancel').onclick = closeModal;
+    $('#exp-save').onclick = async () => {
+      const desc = $('#exp-desc').value.trim();
+      const amount = parseFloat($('#exp-amount').value) || 0;
+      if (!amount) { toast('Enter an amount'); return; }
+      const geo = await getLocation();
+      addExpenseEntry({ description: desc || selectedCat, amount, category: selectedCat, geo });
+      closeModal();
+      toast('Expense logged');
       render();
     };
   };
@@ -1697,6 +1825,25 @@
       return;
     }
 
+    if (e.target.closest('#btn-theme')) {
+      const next = getTheme() === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      const icon = e.target.closest('#btn-theme').querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+      return;
+    }
+
+    if (e.target.closest('#btn-collapse')) {
+      state.hideCompleted = !state.hideCompleted;
+      render();
+      return;
+    }
+
+    if (e.target.closest('#btn-expense-add')) { promptExpenseEntry(); return; }
+
+    const delExpense = e.target.closest('[data-del-expense]');
+    if (delExpense) { deleteExpenseEntry(delExpense.dataset.delExpense); render(); return; }
+
     const weatherBtn = e.target.closest('[data-refresh-weather]');
     if (weatherBtn) { refreshWeather(Number(weatherBtn.dataset.refreshWeather)); return; }
 
@@ -1834,6 +1981,47 @@
     if (e.key === 'Escape' && !$('#search-overlay').classList.contains('hidden')) closeSearch();
     if (e.key === 'Enter' && e.target.id === 'journal-input') {
       if (e.target.value.trim()) { await addJournalEntry(e.target.value); render(); }
+    }
+  });
+
+  // ---------- Swipe between days ----------
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const route = parseRoute();
+    if (route.name !== 'day') return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    const current = route.day || state.trip.days[currentDayIdx()].dayNumber;
+    const idx = state.trip.days.findIndex(d => d.dayNumber === current);
+    if (dx < 0 && idx < state.trip.days.length - 1) {
+      location.hash = `#/day/${state.trip.days[idx + 1].dayNumber}`;
+    } else if (dx > 0 && idx > 0) {
+      location.hash = `#/day/${state.trip.days[idx - 1].dayNumber}`;
+    }
+  }, { passive: true });
+
+  // ---------- Dark/light mode ----------
+  const getTheme = () => localStorage.getItem('tripdna.theme') || 'dark';
+  const applyTheme = (theme) => {
+    localStorage.setItem('tripdna.theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.body.style.background = theme === 'dark' ? '#131313' : '#f5f0eb';
+    document.body.style.color = theme === 'dark' ? '#e5e2e1' : '#1c1b1b';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#131313' : '#f5f0eb';
+  };
+  applyTheme(getTheme());
+  window.addEventListener('load', () => {
+    const btn = $('#btn-theme');
+    if (btn) {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = getTheme() === 'dark' ? 'light_mode' : 'dark_mode';
     }
   });
 
