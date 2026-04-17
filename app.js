@@ -129,6 +129,67 @@
     return parts.join('\n');
   };
 
+  // ---------- Gas tracker ----------
+  const getGasLog = () => {
+    if (!state.trip.gasLog) state.trip.gasLog = [];
+    return state.trip.gasLog;
+  };
+  const addGasEntry = (entry) => {
+    getGasLog().push({ id: `g-${Date.now()}`, ...entry, createdAt: new Date().toISOString(), dayNumber: state.trip.days[currentDayIdx()]?.dayNumber || null });
+    saveTrip();
+  };
+  const deleteGasEntry = (id) => {
+    const g = getGasLog();
+    const idx = g.findIndex(e => e.id === id);
+    if (idx !== -1) { g.splice(idx, 1); saveTrip(); }
+  };
+  const gasStats = () => {
+    const log = getGasLog();
+    const totalGal = log.reduce((s, e) => s + (e.gallons || 0), 0);
+    const totalCost = log.reduce((s, e) => s + (e.total || 0), 0);
+    return { count: log.length, gallons: Math.round(totalGal * 10) / 10, cost: Math.round(totalCost * 100) / 100 };
+  };
+
+  // ---------- Sunrise/Sunset ----------
+  const SUN_DATA = {
+    '2026-04-17': { rise: '7:14 AM', set: '8:11 PM' },
+    '2026-04-18': { rise: '7:13 AM', set: '8:12 PM' },
+    '2026-04-19': { rise: '7:12 AM', set: '8:12 PM' },
+    '2026-04-20': { rise: '7:11 AM', set: '8:13 PM' },
+    '2026-04-21': { rise: '7:10 AM', set: '8:14 PM' },
+    '2026-04-22': { rise: '7:09 AM', set: '8:14 PM' },
+    '2026-04-23': { rise: '7:08 AM', set: '8:15 PM' },
+    '2026-04-24': { rise: '7:07 AM', set: '8:16 PM' },
+    '2026-04-25': { rise: '7:06 AM', set: '8:16 PM' },
+    '2026-04-26': { rise: '7:05 AM', set: '8:17 PM' },
+  };
+
+  // ---------- Emergency info ----------
+  const EMERGENCY = {
+    vehicle: { plate: 'SPL 0139', make: '2023 Hyundai Santa Fe Calligraphy' },
+    contacts: [
+      { label: 'Big Bend NP Rangers', phone: '+14324772251', display: '(432) 477-2251' },
+      { label: 'Brewster County Sheriff', phone: '+14328372424', display: '(432) 837-2424' },
+      { label: 'Big Bend Regional Medical', phone: '+14328372286', display: '(432) 837-2286', note: 'Alpine, TX — nearest hospital' },
+      { label: 'Roadside Assistance (Hyundai)', phone: '+18005654052', display: '(800) 565-4052' },
+      { label: 'Far Flung Adventures', phone: '+14323712633', display: '(432) 371-2633' },
+      { label: 'Poison Control', phone: '+18002221222', display: '(800) 222-1222' },
+    ]
+  };
+
+  // ---------- Day summary ----------
+  const daySummary = (day) => {
+    const acts = day.activities;
+    const done = acts.filter(a => a.status === 'done');
+    const skipped = acts.filter(a => a.status === 'skipped');
+    const pending = acts.filter(a => a.status === 'pending');
+    const miles = done.reduce((s, a) => s + (parseFloat(String(a.distance || '').replace(/[^\d.]/g, '')) || 0), 0);
+    const topRated = done.filter(a => a.rating).sort((a, b) => b.rating - a.rating)[0];
+    const totalRatings = done.filter(a => a.rating);
+    const avgRating = totalRatings.length ? (totalRatings.reduce((s, a) => s + a.rating, 0) / totalRatings.length).toFixed(1) : null;
+    return { done: done.length, skipped: skipped.length, pending: pending.length, total: acts.length, miles: Math.round(miles), topRated, avgRating };
+  };
+
   // ---------- Live countdown ----------
   let countdownInterval;
   const startCountdown = () => {
@@ -150,6 +211,32 @@
       else if (delta < 60) el.textContent = `${delta}m`;
       else el.textContent = `${Math.floor(delta / 60)}h ${delta % 60}m`;
     }, 30000);
+  };
+
+  // ---------- Photo prompt ----------
+  const promptPhoto = (actTitle) => {
+    setTimeout(() => {
+      openModal(`
+        <div class="space-y-4 text-center">
+          <span class="material-symbols-outlined text-5xl text-primary">photo_camera</span>
+          <h3 class="font-headline font-bold text-lg">Capture the moment?</h3>
+          <p class="text-sm text-on-surface-variant">Take a photo of <span class="font-semibold text-on-surface">${h(actTitle)}</span> while you're here</p>
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button id="photo-skip" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Later</button>
+            <button id="photo-open" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">Open Camera</button>
+          </div>
+        </div>
+      `);
+      $('#photo-skip').onclick = closeModal;
+      $('#photo-open').onclick = () => {
+        closeModal();
+        const inp = document.createElement('input');
+        inp.type = 'file';
+        inp.accept = 'image/*';
+        inp.capture = 'environment';
+        inp.click();
+      };
+    }, 400);
   };
 
   // ---------- Toast ----------
@@ -237,12 +324,18 @@
     const { activity } = findActivity(actId);
     const rating = activity.rating || 0;
     const note = activity.notes || '';
+    const now = new Date();
+    const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     openModal(`
       <div class="space-y-5">
         <div>
           <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Completing</p>
           <h3 class="font-headline font-bold text-xl mt-1">${h(activity.title)}</h3>
-          <p class="text-sm text-on-surface-variant mt-1">${fmtTime12(activity.time)}${activity.duration ? ` • ${fmtDuration(activity.duration)}` : ''}</p>
+          <p class="text-sm text-on-surface-variant mt-1">Planned ${fmtTime12(activity.time)}${activity.duration ? ` • ${fmtDuration(activity.duration)}` : ''}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-widest text-on-surface-variant font-semibold mb-2">Actual time (adjust if needed)</p>
+          <input id="done-time" type="time" value="${nowTime}" class="w-full bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
         </div>
         <div>
           <p class="text-xs uppercase tracking-widest text-on-surface-variant font-semibold mb-2">How was it?</p>
@@ -278,13 +371,18 @@
     });
 
     $('#btn-save').onclick = () => {
+      const timeVal = $('#done-time').value;
+      const [dh, dm] = timeVal.split(':').map(Number);
+      const checkedDate = new Date();
+      checkedDate.setHours(dh, dm, 0, 0);
       activity.status = 'done';
-      activity.checkedAt = new Date().toISOString();
+      activity.checkedAt = checkedDate.toISOString();
       activity.rating = pickedRating || null;
       activity.notes = $('#note-field').value.trim();
       saveTrip(); closeModal();
       toast('Checked off');
       render();
+      promptPhoto(activity.title);
     };
     $('#btn-skip').onclick = () => {
       activity.status = 'skipped';
@@ -421,6 +519,39 @@
           ${nextAct ? homeNextCard(nextAct, whenLabel) : `<div class="bg-surface-container rounded-2xl p-5 text-center text-on-surface-variant text-sm">${postTrip ? 'Trip complete — open More to export your memories.' : 'All activities checked off for today'}</div>`}
           ${afterAct ? homeMiniCard(afterAct, 'later') : ''}
         </section>
+
+        ${(() => {
+          const today = todayStr();
+          const skipped = allActivities().filter(a => a.status === 'skipped');
+          const missed = allActivities().filter(a => a.status === 'pending' && a._day.date < today);
+          const items = [
+            ...skipped.map(a => ({ ...a, label: 'Skipped' })),
+            ...missed.map(a => ({ ...a, label: 'Missed' }))
+          ];
+          if (!items.length) return '';
+          return `
+          <section class="space-y-3">
+            <h3 class="font-headline text-lg font-bold tracking-tight">Skipped & Missed (${items.length})</h3>
+            <p class="text-xs text-on-surface-variant">Tap the undo button to revisit or mark done</p>
+            <div class="space-y-2">
+              ${items.map(a => `
+                <div class="flex gap-3 items-center bg-surface-container rounded-xl p-3">
+                  <button data-check="${a.id}" class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant/60 flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+                    <span class="material-symbols-outlined text-lg">undo</span>
+                  </button>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold">${h(a.title)}</p>
+                    <p class="text-[10px] text-on-surface-variant">
+                      <span class="${a.label === 'Missed' ? 'text-primary' : 'text-on-surface-variant'}">${a.label}</span>
+                      • Day ${a._day.dayNumber} • ${fmtTime12(a.time)}
+                    </p>
+                  </div>
+                  <span class="material-symbols-outlined text-on-surface-variant/40">${iconFor(a.type)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </section>`;
+        })()}
       </div>
     `;
   };
@@ -483,22 +614,35 @@
             </a>`).join('')}
         </div>
 
-        <!-- Weather -->
+        <!-- Weather + Sun -->
         ${day.weather ? `
-          <div class="bg-surface-container rounded-2xl p-4 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <div class="w-12 h-12 flex items-center justify-center bg-secondary-container rounded-full text-on-secondary-container">
-                <span class="material-symbols-outlined fill-icon">wb_sunny</span>
+          <div class="bg-surface-container rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 flex items-center justify-center bg-secondary-container rounded-full text-on-secondary-container">
+                  <span class="material-symbols-outlined fill-icon">wb_sunny</span>
+                </div>
+                <div>
+                  <p class="font-headline font-bold text-lg leading-tight">${day.weather.high}° / ${day.weather.low}°</p>
+                  <p class="text-on-surface-variant text-xs uppercase tracking-widest">${h(day.weather.condition || '')}</p>
+                </div>
               </div>
-              <div>
-                <p class="font-headline font-bold text-lg leading-tight">${day.weather.high}° / ${day.weather.low}°</p>
-                <p class="text-on-surface-variant text-xs uppercase tracking-widest">${h(day.weather.condition || '')}</p>
-              </div>
+              ${day.weather.rainChance ? `
+                <div class="flex items-center gap-1 text-on-surface-variant">
+                  <span class="material-symbols-outlined text-sm">water_drop</span>
+                  <span class="text-sm font-semibold">${day.weather.rainChance}%</span>
+                </div>` : ''}
             </div>
-            ${day.weather.rainChance ? `
-              <div class="flex items-center gap-1 text-on-surface-variant">
-                <span class="material-symbols-outlined text-sm">water_drop</span>
-                <span class="text-sm font-semibold">${day.weather.rainChance}%</span>
+            ${SUN_DATA[day.date] ? `
+              <div class="flex gap-4 pt-1">
+                <div class="flex items-center gap-1.5 text-on-surface-variant text-xs">
+                  <span class="material-symbols-outlined text-sm text-primary">wb_twilight</span>
+                  <span>${SUN_DATA[day.date].rise}</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-on-surface-variant text-xs">
+                  <span class="material-symbols-outlined text-sm text-primary-container">wb_twilight</span>
+                  <span>${SUN_DATA[day.date].set}</span>
+                </div>
               </div>` : ''}
           </div>` : ''}
 
@@ -507,6 +651,27 @@
           <div class="absolute left-[27px] top-4 bottom-4 w-[2px] bg-surface-container-highest"></div>
           ${day.activities.map((a, i) => activityCard(a, i === firstPendingIdx, day)).join('')}
         </div>
+
+        <!-- Day Summary -->
+        ${(() => {
+          const s = daySummary(day);
+          if (!s.done && !s.skipped) return '';
+          return `
+          <div class="bg-surface-container rounded-2xl p-5 space-y-3">
+            <h3 class="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant">Day ${day.dayNumber} Summary</h3>
+            <div class="grid grid-cols-4 gap-3">
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Done</p><p class="font-headline font-bold text-lg text-tertiary">${s.done}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Skipped</p><p class="font-headline font-bold text-lg">${s.skipped}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Miles</p><p class="font-headline font-bold text-lg">${s.miles}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Avg</p><p class="font-headline font-bold text-lg">${s.avgRating ? s.avgRating + '★' : '—'}</p></div>
+            </div>
+            ${s.topRated ? `
+              <div class="bg-surface-container-low rounded-xl p-3 flex items-center gap-2">
+                <span class="material-symbols-outlined text-tertiary fill-icon text-sm">star</span>
+                <span class="text-xs text-on-surface-variant">Top rated: <span class="text-on-surface font-semibold">${h(s.topRated.title)}</span> (${s.topRated.rating}★)</span>
+              </div>` : ''}
+          </div>`;
+        })()}
       </div>
     `;
   };
@@ -609,6 +774,7 @@
               <div class="flex items-center gap-2">
                 ${a.highlight ? `<span class="text-[9px] font-bold uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full">Highlight</span>` : ''}
                 ${isNextUp ? `<span class="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full">Next Up</span>` : ''}
+                <button data-share-act="${a.id}" class="p-1 text-on-surface-variant/60 active:scale-90 transition-transform" title="Share"><span class="material-symbols-outlined text-[16px]">share</span></button>
                 ${!done && !skipped ? `<button data-time-shift="${a.id}" class="p-1 text-on-surface-variant/60 active:scale-90 transition-transform" title="Adjust time"><span class="material-symbols-outlined text-[16px]">schedule</span></button>` : ''}
                 ${a.duration ? `<span class="text-[10px] uppercase font-medium text-on-surface-variant">${fmtDuration(a.duration)}</span>` : ''}
               </div>
@@ -778,6 +944,9 @@
     const categories = [...new Set(trip.packingList.map(p => p.category))];
     const packed = trip.packingList.filter(p => p.packed).length;
     const totalCost = trip.bookings.reduce((s, b) => s + (b.cost || 0), 0);
+    const journal = getJournal();
+    const gas = getGasLog();
+    const gs = gasStats();
 
     return `
       <div class="fade-in space-y-8 pt-2">
@@ -786,6 +955,96 @@
           <h2 class="font-headline font-extrabold text-4xl tracking-tight">More</h2>
         </section>
 
+        <!-- Emergency Info -->
+        <section class="bg-surface-container-lowest rounded-2xl overflow-hidden">
+          <div class="flex items-center gap-2 px-5 pt-4 pb-2">
+            <span class="material-symbols-outlined text-error fill-icon text-lg">emergency</span>
+            <h3 class="font-headline font-bold text-sm uppercase tracking-widest text-error">Emergency & Vehicle</h3>
+          </div>
+          <div class="px-5 pb-4 space-y-3">
+            <div class="bg-surface-container-low rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Vehicle</p>
+                <p class="text-sm font-semibold">${h(EMERGENCY.vehicle.make)}</p>
+              </div>
+              <button data-copy="${h(EMERGENCY.vehicle.plate)}" class="flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-lg active:scale-95 transition-transform">
+                <span class="font-mono text-sm font-bold text-primary">${h(EMERGENCY.vehicle.plate)}</span>
+                <span class="material-symbols-outlined text-sm text-on-surface-variant">content_copy</span>
+              </button>
+            </div>
+            ${EMERGENCY.contacts.map(c => `
+              <a href="tel:${c.phone}" class="flex items-center gap-3 bg-surface-container-low rounded-xl p-3 active:scale-[0.99] transition-transform">
+                <span class="material-symbols-outlined text-error text-lg">call</span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold">${h(c.label)}</p>
+                  <p class="text-xs text-on-surface-variant">${h(c.display)}${c.note ? ` — ${h(c.note)}` : ''}</p>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </section>
+
+        <!-- Journal -->
+        <section class="bg-surface-container rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-headline font-bold text-lg">Trip Journal</h3>
+            <span class="text-xs text-on-surface-variant uppercase tracking-widest">${journal.length} notes</span>
+          </div>
+          <div class="flex gap-2">
+            <input id="journal-input" type="text" placeholder="Quick note, tip, or memory…" class="flex-1 bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60 placeholder:text-on-surface-variant/50" />
+            <button id="btn-journal-add" class="px-4 py-2.5 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase active:scale-95 transition-transform">
+              <span class="material-symbols-outlined text-sm">add</span>
+            </button>
+          </div>
+          ${journal.length ? `
+            <div class="space-y-2 pt-1">
+              ${[...journal].reverse().map(e => `
+                <div class="flex gap-2 items-start bg-surface-container-low rounded-xl p-3">
+                  <span class="material-symbols-outlined text-primary text-sm mt-0.5">edit_note</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm">${h(e.text)}</p>
+                    <p class="text-[10px] text-on-surface-variant mt-1">Day ${e.dayNumber || '?'} • ${fmtCheckedAt(e.createdAt)}</p>
+                  </div>
+                  <button data-del-journal="${e.id}" class="p-1 text-on-surface-variant/40 active:scale-90 transition-transform">
+                    <span class="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+              `).join('')}
+            </div>` : `<p class="text-xs text-on-surface-variant">No notes yet. Jot down tips, memories, or things to remember for next time.</p>`}
+        </section>
+
+        <!-- Gas Tracker -->
+        <section class="bg-surface-container rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-headline font-bold text-lg">Gas Log</h3>
+            <button id="btn-gas-add" class="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface text-xs font-bold uppercase tracking-widest active:scale-95 transition-transform flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add</span> Fill-up
+            </button>
+          </div>
+          ${gs.count ? `
+            <div class="grid grid-cols-3 gap-3">
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Stops</p><p class="font-headline font-bold text-lg">${gs.count}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Gallons</p><p class="font-headline font-bold text-lg">${gs.gallons}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Spent</p><p class="font-headline font-bold text-lg">$${gs.cost.toFixed(0)}</p></div>
+            </div>
+            <div class="space-y-2 pt-1">
+              ${[...gas].reverse().map(e => `
+                <div class="flex gap-3 items-center bg-surface-container-low rounded-xl p-3">
+                  <span class="material-symbols-outlined text-on-surface-variant">local_gas_station</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold">${h(e.location || 'Fill-up')}</p>
+                    <p class="text-[10px] text-on-surface-variant">${e.gallons ? e.gallons + ' gal' : ''}${e.pricePerGal ? ` @ $${e.pricePerGal}/gal` : ''} • Day ${e.dayNumber || '?'}</p>
+                  </div>
+                  <span class="text-sm font-bold text-on-surface">$${(e.total || 0).toFixed(2)}</span>
+                  <button data-del-gas="${e.id}" class="p-1 text-on-surface-variant/40 active:scale-90 transition-transform">
+                    <span class="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+              `).join('')}
+            </div>` : `<p class="text-xs text-on-surface-variant">Log fill-ups to track fuel spend across the trip.</p>`}
+        </section>
+
+        <!-- Packing -->
         <section class="bg-surface-container rounded-2xl p-5 space-y-3">
           <div class="flex items-center justify-between">
             <h3 class="font-headline font-bold text-lg">Packing</h3>
@@ -826,7 +1085,7 @@
           <h3 class="font-headline font-bold text-lg">Travel DNA</h3>
           <ul class="space-y-2">
             ${trip.travelPreferences.existingPreferences.map(p => `
-              <li class="flex gap-2 text-sm text-on-surface-variant"><span class="text-primary">•</span><span>${h(p)}</span></li>
+              <li class="flex gap-2 text-sm text-on-surface-variant"><span class="text-primary">&bull;</span><span>${h(p)}</span></li>
             `).join('')}
           </ul>
         </section>
@@ -848,7 +1107,7 @@
           <input id="file-import" type="file" accept="application/json" class="hidden" />
         </section>
 
-        <p class="text-center text-[10px] text-on-surface-variant/60 pt-2 pb-6">TripDNA v0.1 • offline-first</p>
+        <p class="text-center text-[10px] text-on-surface-variant/60 pt-2 pb-6">TripDNA v0.2 • offline-first</p>
       </div>
     `;
   };
@@ -896,6 +1155,48 @@
       }
     };
     reader.readAsText(file);
+  };
+
+  const promptGasEntry = () => {
+    openModal(`
+      <div class="space-y-4">
+        <div>
+          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Log Fill-Up</p>
+          <h3 class="font-headline font-bold text-xl mt-1">Gas Stop</h3>
+        </div>
+        <input id="gas-location" type="text" placeholder="Location (e.g. Alpine Chevron)" class="w-full bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+        <div class="grid grid-cols-2 gap-3">
+          <input id="gas-gallons" type="number" step="0.1" placeholder="Gallons" class="bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+          <input id="gas-ppg" type="number" step="0.01" placeholder="$/gallon" class="bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+        </div>
+        <input id="gas-total" type="number" step="0.01" placeholder="Total $ (auto-calculated or override)" class="w-full bg-surface-container-low text-on-surface px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/60" />
+        <div class="grid grid-cols-2 gap-3">
+          <button id="gas-cancel" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Cancel</button>
+          <button id="gas-save" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">Save</button>
+        </div>
+      </div>
+    `);
+
+    const galInp = $('#gas-gallons'), ppgInp = $('#gas-ppg'), totInp = $('#gas-total');
+    const autoCalc = () => {
+      const g = parseFloat(galInp.value), p = parseFloat(ppgInp.value);
+      if (g && p && !totInp.value) totInp.value = (g * p).toFixed(2);
+    };
+    galInp.addEventListener('input', autoCalc);
+    ppgInp.addEventListener('input', autoCalc);
+
+    $('#gas-cancel').onclick = closeModal;
+    $('#gas-save').onclick = () => {
+      const gallons = parseFloat(galInp.value) || 0;
+      const pricePerGal = parseFloat(ppgInp.value) || 0;
+      const total = parseFloat(totInp.value) || (gallons * pricePerGal);
+      const location = $('#gas-location').value.trim();
+      if (!total && !gallons) { toast('Enter gallons or total'); return; }
+      addGasEntry({ location, gallons, pricePerGal, total });
+      closeModal();
+      toast('Fill-up logged');
+      render();
+    };
   };
 
   const resetTrip = () => {
@@ -1110,6 +1411,28 @@
 
   // ---------- Event delegation ----------
   document.addEventListener('click', (e) => {
+    if (e.target.closest('#fab-journal')) {
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-2xl">edit_note</span>
+            <h3 class="font-headline font-bold text-lg">Quick Note</h3>
+          </div>
+          <textarea id="fab-note" rows="4" placeholder="Tip, memory, something to remember for next trip…" class="w-full bg-surface-container-low text-on-surface p-3 rounded-xl resize-none outline-none focus:ring-2 focus:ring-primary/60 text-sm" autofocus></textarea>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="fab-cancel" class="py-3 rounded-xl bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-widest active:scale-95 transition-transform">Cancel</button>
+            <button id="fab-save" class="py-3 rounded-xl terracotta-glow text-on-primary-container font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform">Save</button>
+          </div>
+        </div>
+      `);
+      $('#fab-cancel').onclick = closeModal;
+      $('#fab-save').onclick = () => {
+        const t = $('#fab-note').value;
+        if (t.trim()) { addJournalEntry(t); closeModal(); toast('Note saved'); render(); }
+      };
+      return;
+    }
+
     if (e.target.closest('#btn-search') || e.target.closest('#home-search')) { openSearch(); return; }
     if (e.target.closest('#search-close')) { closeSearch(); return; }
 
@@ -1174,8 +1497,36 @@
       return;
     }
 
+    const shareAct = e.target.closest('[data-share-act]');
+    if (shareAct) {
+      const found = findActivity(shareAct.dataset.shareAct);
+      if (found) {
+        const txt = activityToText(found.activity, found.day);
+        if (navigator.share) {
+          navigator.share({ title: found.activity.title, text: txt }).catch(() => {});
+        } else {
+          copyText(txt);
+        }
+      }
+      return;
+    }
+
     const focusBooking = e.target.closest('[data-focus-booking]');
     if (focusBooking) { sessionStorage.setItem('focus-booking', focusBooking.dataset.focusBooking); return; }
+
+    if (e.target.closest('#btn-journal-add')) {
+      const inp = $('#journal-input');
+      if (inp && inp.value.trim()) { addJournalEntry(inp.value); render(); }
+      return;
+    }
+
+    const delJournal = e.target.closest('[data-del-journal]');
+    if (delJournal) { deleteJournalEntry(delJournal.dataset.delJournal); render(); return; }
+
+    const delGas = e.target.closest('[data-del-gas]');
+    if (delGas) { deleteGasEntry(delGas.dataset.delGas); render(); return; }
+
+    if (e.target.closest('#btn-gas-add')) { promptGasEntry(); return; }
 
     if (e.target.closest('#btn-export')) { exportTrip(); return; }
     if (e.target.closest('#btn-import')) { $('#file-import').click(); return; }
@@ -1195,6 +1546,9 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#search-overlay').classList.contains('hidden')) closeSearch();
+    if (e.key === 'Enter' && e.target.id === 'journal-input') {
+      if (e.target.value.trim()) { addJournalEntry(e.target.value); render(); }
+    }
   });
 
   window.addEventListener('hashchange', render);
