@@ -709,8 +709,199 @@
     }
   };
 
+  // ---------- Search ----------
+  const CATEGORY_KEYWORDS = {
+    'hike':       ['hike', 'trail', 'trek', 'trekking', 'hiking', 'elevation', 'lost mine', 'window trail', 'canyon trail', 'skyline'],
+    'drive':      ['drive', 'driving', 'road', 'depart', 'arrive', 'gas', 'fuel', 'miles'],
+    'food':       ['food', 'eat', 'lunch', 'dinner', 'breakfast', 'coffee', 'restaurant', 'cafe', 'burrito'],
+    'lodging':    ['lodge', 'lodging', 'hotel', 'check in', 'check out', 'ranch', 'room', 'inn'],
+    'experience': ['experience', 'stargazing', 'star party', 'hot springs', 'soak', 'mystery lights', 'float'],
+    'sightseeing':['sightseeing', 'ghost town', 'museum', 'gallery', 'prada', 'chinati', 'scenic', 'overlook', 'fossil'],
+    'activity':   ['activity', 'kayak', 'canoe', 'swim', 'pool', 'observatory', 'solar', 'telescope', 'balmorhea'],
+    'rest':       ['rest', 'nap', 'sleep', 'relax', 'recovery', 'decompress'],
+  };
+
+  const expandQuery = (q) => {
+    const low = q.toLowerCase();
+    const extra = [];
+    for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
+      if (kws.some(k => low.includes(k) || k.includes(low))) extra.push(cat);
+    }
+    return extra;
+  };
+
+  const searchTrip = (q, activeFilter) => {
+    const low = q.toLowerCase().trim();
+    if (!low && !activeFilter) return { activities: [], bookings: [], packing: [] };
+    const cats = expandQuery(low);
+
+    const matchAct = (a) => {
+      if (activeFilter && a.type !== activeFilter && !cats.includes(activeFilter)) return false;
+      if (activeFilter && a.type === activeFilter && !low) return true;
+      const hay = [a.title, a.description, a.type, ...(a.alerts || []), a.distance, a.difficulty].filter(Boolean).join(' ').toLowerCase();
+      if (hay.includes(low)) return true;
+      if (cats.includes(a.type)) return true;
+      return false;
+    };
+
+    const matchBooking = (b) => {
+      if (activeFilter && activeFilter !== 'booking') return false;
+      const hay = [b.name, b.address, b.notes, b.type, b.confirmationNumber].filter(Boolean).join(' ').toLowerCase();
+      return !low || hay.includes(low);
+    };
+
+    const matchPacking = (p) => {
+      if (activeFilter && activeFilter !== 'packing') return false;
+      const hay = [p.item, p.category].join(' ').toLowerCase();
+      return !low || hay.includes(low);
+    };
+
+    const activities = [];
+    for (const d of state.trip.days) {
+      for (const a of d.activities) {
+        if (matchAct(a)) activities.push({ ...a, _dayNumber: d.dayNumber, _dayDate: d.date });
+      }
+    }
+    const bookings = state.trip.bookings.filter(matchBooking);
+    const packing = state.trip.packingList.filter(matchPacking);
+    return { activities, bookings, packing };
+  };
+
+  let searchFilter = null;
+
+  const openSearch = () => {
+    searchFilter = null;
+    const el = $('#search-overlay');
+    el.classList.remove('hidden');
+    const inp = $('#search-input');
+    inp.value = '';
+    inp.focus();
+    renderSearchChips();
+    renderSearchResults();
+  };
+
+  const closeSearch = () => {
+    $('#search-overlay').classList.add('hidden');
+    searchFilter = null;
+  };
+
+  const renderSearchChips = () => {
+    const types = ['hike', 'drive', 'food', 'lodging', 'experience', 'sightseeing', 'activity', 'rest', 'booking', 'packing'];
+    $('#search-chips').innerHTML = types.map(t => `
+      <button data-search-chip="${t}" class="shrink-0 px-3 py-1.5 rounded-full text-[11px] uppercase tracking-widest font-bold whitespace-nowrap ${searchFilter === t ? 'terracotta-glow text-on-primary-container' : 'bg-surface-container text-on-surface-variant'} active:scale-95 transition-transform">
+        <span class="material-symbols-outlined text-[14px] align-middle mr-0.5">${t === 'booking' ? 'confirmation_number' : t === 'packing' ? 'inventory_2' : iconFor(t)}</span>
+        ${t}
+      </button>
+    `).join('');
+  };
+
+  const renderSearchResults = () => {
+    const q = ($('#search-input')?.value || '');
+    const { activities, bookings, packing } = searchTrip(q, searchFilter);
+    const container = $('#search-results');
+
+    if (!q && !searchFilter) {
+      container.innerHTML = `<p class="text-center text-on-surface-variant text-sm pt-16">Type to search or tap a category above</p>`;
+      return;
+    }
+
+    const total = activities.length + bookings.length + packing.length;
+    if (!total) {
+      container.innerHTML = `<p class="text-center text-on-surface-variant text-sm pt-16">No results for "${h(q)}"</p>`;
+      return;
+    }
+
+    let html = '';
+
+    if (activities.length) {
+      html += `<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mt-4 mb-2">Activities (${activities.length})</p>`;
+      html += `<div class="space-y-2">`;
+      for (const a of activities) {
+        const done = a.status === 'done';
+        html += `
+          <button data-search-act="${a.id}" data-search-day="${a._dayNumber}" class="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform">
+            <span class="material-symbols-outlined ${done ? 'text-tertiary' : 'text-on-surface-variant'}">${iconFor(a.type)}</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold truncate ${done ? 'line-through text-on-surface-variant/60' : ''}">${h(a.title)}</p>
+              <p class="text-[11px] text-on-surface-variant truncate">Day ${a._dayNumber} • ${fmtTime12(a.time)}${a.description ? ` • ${h(a.description).slice(0, 50)}` : ''}</p>
+            </div>
+            ${a.highlight ? `<span class="material-symbols-outlined text-sm text-tertiary fill-icon">star</span>` : ''}
+          </button>`;
+      }
+      html += `</div>`;
+    }
+
+    if (bookings.length) {
+      html += `<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mt-6 mb-2">Bookings (${bookings.length})</p>`;
+      html += `<div class="space-y-2">`;
+      for (const b of bookings) {
+        html += `
+          <button data-search-booking="${b.id}" class="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform">
+            <span class="material-symbols-outlined text-on-surface-variant">${b.type === 'lodging' ? 'hotel' : 'local_activity'}</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold truncate">${h(b.name)}</p>
+              <p class="text-[11px] text-on-surface-variant truncate">${b.confirmationNumber ? `#${h(b.confirmationNumber)}` : ''} ${b.address ? `• ${h(b.address).slice(0, 40)}` : ''}</p>
+            </div>
+          </button>`;
+      }
+      html += `</div>`;
+    }
+
+    if (packing.length) {
+      html += `<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mt-6 mb-2">Packing (${packing.length})</p>`;
+      html += `<div class="space-y-2">`;
+      for (const p of packing) {
+        html += `
+          <button data-search-pack="${p.id}" class="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform">
+            <span class="material-symbols-outlined ${p.packed ? 'text-tertiary fill-icon' : 'text-on-surface-variant'}">${p.packed ? 'check_circle' : 'radio_button_unchecked'}</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm ${p.packed ? 'line-through text-on-surface-variant/60' : ''}">${h(p.item)}</p>
+              <p class="text-[11px] text-on-surface-variant">${h(p.category)}</p>
+            </div>
+          </button>`;
+      }
+      html += `</div>`;
+    }
+
+    container.innerHTML = html;
+  };
+
   // ---------- Event delegation ----------
   document.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-search')) { openSearch(); return; }
+    if (e.target.closest('#search-close')) { closeSearch(); return; }
+
+    const chip = e.target.closest('[data-search-chip]');
+    if (chip) {
+      const v = chip.dataset.searchChip;
+      searchFilter = searchFilter === v ? null : v;
+      renderSearchChips();
+      renderSearchResults();
+      return;
+    }
+
+    const searchAct = e.target.closest('[data-search-act]');
+    if (searchAct) {
+      closeSearch();
+      location.hash = `#/day/${searchAct.dataset.searchDay}`;
+      return;
+    }
+
+    const searchBooking = e.target.closest('[data-search-booking]');
+    if (searchBooking) {
+      closeSearch();
+      sessionStorage.setItem('focus-booking', searchBooking.dataset.searchBooking);
+      location.hash = '#/bookings';
+      return;
+    }
+
+    const searchPack = e.target.closest('[data-search-pack]');
+    if (searchPack) {
+      const it = state.trip.packingList.find(p => p.id === searchPack.dataset.searchPack);
+      if (it) { it.packed = !it.packed; saveTrip(); renderSearchResults(); }
+      return;
+    }
+
     const copyBtn = e.target.closest('[data-copy]');
     if (copyBtn) { copyText(copyBtn.dataset.copy); return; }
 
@@ -739,11 +930,19 @@
     if (e.target.closest('#btn-reset')) { resetTrip(); return; }
   });
 
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'search-input') renderSearchResults();
+  });
+
   document.addEventListener('change', (e) => {
     if (e.target.id === 'file-import' && e.target.files[0]) {
       importTrip(e.target.files[0]);
       e.target.value = '';
     }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#search-overlay').classList.contains('hidden')) closeSearch();
   });
 
   window.addEventListener('hashchange', render);

@@ -81,6 +81,9 @@
       <h1 class="text-primary font-headline font-extrabold tracking-widest uppercase text-lg">TripDNA</h1>
     </div>
     <div id="top-right" class="flex items-center gap-2">
+      <button id="btn-search" class="w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" aria-label="Search">
+        <span class="material-symbols-outlined text-[20px]">search</span>
+      </button>
       <button id="btn-back" class="hidden w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" aria-label="Back">
         <span class="material-symbols-outlined text-[20px]">arrow_back</span>
       </button>
@@ -117,6 +120,19 @@
       <span class="text-[10px] font-medium uppercase tracking-widest">More</span>
     </a>
   </nav>
+
+  <!-- Search overlay -->
+  <div id="search-overlay" class="hidden fixed inset-0 z-[60] bg-background flex flex-col">
+    <div class="flex items-center gap-3 px-5 pt-5 pb-3">
+      <button id="search-close" class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+        <span class="material-symbols-outlined">arrow_back</span>
+      </button>
+      <input id="search-input" type="text" placeholder="Search activities, bookings, packing…"
+        class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:ring-2 focus:ring-primary/60 text-sm" autocomplete="off" />
+    </div>
+    <div id="search-chips" class="flex gap-2 px-5 pb-3 overflow-x-auto"></div>
+    <div id="search-results" class="flex-1 overflow-y-auto px-5 pb-8"></div>
+  </div>
 
   <!-- Check-off modal -->
   <div id="modal" class="hidden fixed inset-0 z-[70] items-end sm:items-center justify-center">
