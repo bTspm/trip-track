@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#131313" />
+  <title>TripDNA — West Texas</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8C%B5%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8C%B5%3C/text%3E%3C/svg%3E" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-lowest": "#0e0e0e",
+            "on-surface": "#e5e2e1",
+            "secondary-container": "#5b4526",
+            "on-secondary-container": "#d2b48c",
+            "on-surface-variant": "#dcc1b6",
+            "surface-container-low": "#1c1b1b",
+            "outline-variant": "#56423a",
+            "surface-container-high": "#2a2a2a",
+            "surface-container-highest": "#353535",
+            "primary-fixed-dim": "#ffb68d",
+            "error": "#ffb4ab",
+            "on-primary": "#532200",
+            "surface-container": "#20201f",
+            "on-secondary": "#402d10",
+            "background": "#131313",
+            "surface": "#131313",
+            "tertiary-container": "#879759",
+            "on-tertiary-container": "#222e00",
+            "primary-container": "#df7328",
+            "on-primary-container": "#481d00",
+            "surface-bright": "#393939",
+            "tertiary": "#bdce89",
+            "secondary": "#e1c299",
+            "primary": "#ffb68d",
+            "on-background": "#e5e2e1"
+          },
+          fontFamily: {
+            headline: ["Manrope", "sans-serif"],
+            body: ["Work Sans", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    html, body { background: #131313; color: #e5e2e1; }
+    body { font-family: 'Work Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .fill-icon { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+    .terracotta-glow { background: linear-gradient(135deg, #ffb68d 0%, #df7328 100%); }
+    .ambient-shadow { box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
+    [data-view] { display: none; }
+    [data-view].active { display: block; }
+    .fade-in { animation: fade-in 220ms ease-out; }
+    @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    button, a { touch-action: manipulation; }
+    textarea { font-family: inherit; }
+    /* safe-area for iOS */
+    .pb-nav { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+    .nav-bottom { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  </style>
+</head>
+<body class="bg-background text-on-background">
+
+  <!-- Top App Bar -->
+  <header class="fixed top-0 left-0 w-full z-50 bg-background/70 backdrop-blur-xl flex justify-between items-center px-6 py-4">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary">explore</span>
+      <h1 class="text-primary font-headline font-extrabold tracking-widest uppercase text-lg">TripDNA</h1>
+    </div>
+    <div id="top-right" class="flex items-center gap-2">
+      <button id="btn-back" class="hidden w-9 h-9 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center active:scale-90 transition-transform" aria-label="Back">
+        <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="pt-20 pb-nav px-5 max-w-2xl mx-auto">
+    <!-- Dashboard -->
+    <section data-view="home"></section>
+    <!-- Day view -->
+    <section data-view="day"></section>
+    <!-- Bookings -->
+    <section data-view="bookings"></section>
+    <!-- More / Settings -->
+    <section data-view="more"></section>
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-2 nav-bottom bg-surface-container/80 backdrop-blur-xl z-50 rounded-t-3xl shadow-[0px_-10px_30px_rgba(0,0,0,0.5)]">
+    <a data-nav="home" href="#/" class="nav-item flex flex-col items-center justify-center text-on-surface-variant p-2 min-w-[64px]">
+      <span class="material-symbols-outlined mb-1">home</span>
+      <span class="text-[10px] font-medium uppercase tracking-widest">Home</span>
+    </a>
+    <a data-nav="day" href="#/day" class="nav-item flex flex-col items-center justify-center text-on-surface-variant p-2 min-w-[64px]">
+      <span class="material-symbols-outlined mb-1">today</span>
+      <span class="text-[10px] font-medium uppercase tracking-widest">Day</span>
+    </a>
+    <a data-nav="bookings" href="#/bookings" class="nav-item flex flex-col items-center justify-center text-on-surface-variant p-2 min-w-[64px]">
+      <span class="material-symbols-outlined mb-1">confirmation_number</span>
+      <span class="text-[10px] font-medium uppercase tracking-widest">Bookings</span>
+    </a>
+    <a data-nav="more" href="#/more" class="nav-item flex flex-col items-center justify-center text-on-surface-variant p-2 min-w-[64px]">
+      <span class="material-symbols-outlined mb-1">more_horiz</span>
+      <span class="text-[10px] font-medium uppercase tracking-widest">More</span>
+    </a>
+  </nav>
+
+  <!-- Check-off modal -->
+  <div id="modal" class="hidden fixed inset-0 z-[70] items-end sm:items-center justify-center">
+    <div id="modal-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div id="modal-body" class="relative w-full sm:max-w-md bg-surface-container-high rounded-t-3xl sm:rounded-2xl p-6 ambient-shadow fade-in"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-28 left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface px-4 py-2 rounded-full text-sm font-medium opacity-0 transition-opacity duration-200 pointer-events-none z-[80]"></div>
+
+  <script src="trip.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
