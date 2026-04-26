@@ -474,17 +474,115 @@ Activity status tracking:
 
 ---
 
-## Future Roadmap (Post-MVP)
+## v0.3 Backlog — Post-Trip Learnings (West Texas 2026)
+
+Identified after completing the first real trip. Ordered by priority.
+
+### P0 — Core UX Gaps
+
+- [ ] **Start/End activity tracking** — Replace single "Mark Done" with Start + End buttons. Start begins a timer, End records actual duration. Gives real vs planned duration data. Critical for hikes and long activities.
+- [ ] **Add/remove/edit activities** — Plan is currently frozen from JSON import. Need ability to: add a spontaneous activity ("found a great taco stand"), remove one that doesn't apply, edit details on existing ones.
+- [ ] **Reschedule skipped activities** — Move a skipped activity from Day 3 to Day 5. "I skipped this but want to do it later" is a common real-world pattern.
+- [ ] **Date + time picker on check-off** — Currently only time (same day) is adjustable. If you forgot to check off yesterday, you're stuck. Full date+time picker needed.
+- [ ] **Fix stats calculations** — Driven miles, drive time, and elevation are calculated from activity metadata but not matching reality. Need to audit: are all drive activities being counted? Are skipped-but-done activities tracked? Should manually-entered values override calculated ones?
+
+### P1 — Financial Tracking Fixes
+
+- [ ] **Fix gas total cost calculation** — Sum is wrong. Audit the gasStats() reducer against actual exported data.
+- [ ] **Edit expenses** — Currently delete-and-recreate only. Add tap-to-edit modal.
+- [ ] **Expenses tab with filters** — Dedicated tab or sub-view. Filter by: category, day, date range. Sort by amount. Search. Better than buried in More tab.
+- [ ] **Correct booking costs** — Some bookings (e.g., Chisos Lodge) only had prepayment amount, not full bill. Need ability to update booking costs post-trip with actual charges.
+
+### P2 — Location & Maps
+
+- [ ] **Business/place search instead of lat/lng** — Instead of showing raw coordinates, resolve to a business name via Google Places or similar. Type "V6 Coffee" → resolves to the Maps listing. Requires API key.
+- [ ] **Edit/override location on check-off** — Show auto-captured GPS with option to adjust — pick from map or type an address.
+- [ ] **Route weather for long drives** — On driving days, show weather at waypoints along the route (Junction, Ozona, Marathon) not just destination. Multiple Open-Meteo queries by coordinates.
+
+### P3 — Content Enrichment
+
+- [ ] **Restaurant menu highlights** — Add `menuHighlights` field to food activities: "Diego Burger (Top 50 in TX)", "chile relleno". Claude populates during planning. Show in activity detail modal.
+- [ ] **Taste-matched recommendations** — Filter menu items by user preferences (no alcohol, vegetarian, etc.). Requires taste profile in travel preferences.
+- [ ] **Show dates alongside day numbers** — "Day 1 · Apr 17" everywhere instead of just "Day 1". More useful mid-trip when thinking in calendar dates.
+
+### P4 — UX Polish
+
+- [ ] **Auto-focus current day** — Day tab defaults to today. Auto-scroll to current/next pending activity, not top of page.
+- [ ] **Collapse completed by default mid-trip** — If you're on Day 7, don't show 6 days of completed activities on the dashboard.
+
+---
+
+## v1.0 — From Prototype to Product
+
+### What it takes to make this a real app
+
+The current MVP is a static HTML/JS file with localStorage. To become a proper product:
+
+#### Backend & Data Layer
+- [ ] **Database** — PostgreSQL or Supabase (Postgres + auth + realtime). Store trips, activities, expenses, journal, gas log, user preferences.
+- [ ] **Authentication** — Email/password or OAuth (Google, Apple). Supabase Auth or Auth.js.
+- [ ] **User profiles** — Travel preferences, taste profile, past trip history, accumulated Travel DNA. Persists across devices.
+- [ ] **API layer** — REST or tRPC endpoints for CRUD on trips, activities, expenses. Or use Supabase client directly.
+- [ ] **Real-time sync** — Changes on phone sync to cloud instantly. Open on laptop and see the same state. Supabase Realtime or WebSockets.
+
+#### Multi-Trip Support
+- [ ] **Trip history** — List of all trips, past and upcoming. Tap to open any trip.
+- [ ] **Trip templates** — Save a trip structure as a template for re-use or sharing.
+- [ ] **Cross-trip analytics** — Total miles driven across all trips, most-visited regions, spending trends, preference evolution.
+
+#### Offline-First Architecture
+- [ ] **Offline writes with sync** — IndexedDB as local store, sync queue for when back online. Conflict resolution (last-write-wins or merge).
+- [ ] **Service worker v2** — Cache API responses, not just static assets. Background sync for pending writes.
+
+#### Claude Integration
+- [ ] **Built-in trip planning** — Chat with Claude inside the app to plan a new trip. Claude reads your Travel DNA, past trip ratings, preferences.
+- [ ] **Auto-generate trip JSON** — Claude outputs the trip schema directly, imported automatically. No copy-paste.
+- [ ] **Post-trip review with Claude** — Feed completed trip data to Claude for analysis: "What should I do differently next time?"
+
+#### Collaboration
+- [ ] **Share trip with travel partner** — Invite by email/link. Both see the same trip, both can check off activities.
+- [ ] **Real-time presence** — See what your partner just checked off or noted.
+
+#### Photo & Media
+- [ ] **Photo storage** — Upload photos per activity. Store in Supabase Storage or S3.
+- [ ] **Photo timeline** — Chronological gallery of trip photos mapped to activities.
+- [ ] **Auto-tag photos** — Match camera roll photos to activities by timestamp + GPS proximity.
+
+#### Notifications
+- [ ] **Push notifications** — "15 min until next activity", "Don't forget to fill gas in Alpine", "Leave by 2:30 PM for Chisos."
+- [ ] **Morning briefing** — Daily notification with today's highlights, weather, alerts, essentials.
+
+#### Maps
+- [ ] **Embedded map view** — See all activities plotted on a map. Tap pins to open details.
+- [ ] **Offline map tiles** — Download map region for offline use in areas with no signal (Big Bend).
+- [ ] **Route visualization** — Show driving route between activities on the map.
+
+### Recommended Tech Stack for v1.0
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Frontend | React + Vite or Next.js | Component architecture, SSR for SEO, ecosystem |
+| Styling | Tailwind CSS | Already using it, keep the design system |
+| State | Zustand + React Query | Local state + server state separation |
+| Backend | Supabase | Postgres + Auth + Realtime + Storage in one. Free tier generous. |
+| Offline | IndexedDB + Workbox | Battle-tested offline-first PWA tooling |
+| AI | Claude API (Anthropic SDK) | Trip planning, post-trip analysis, menu recommendations |
+| Maps | Mapbox GL or Google Maps SDK | Offline tiles, route rendering, place search |
+| Hosting | Vercel | Auto-deploy from GitHub, edge functions, free tier |
+| Mobile | PWA first, then Capacitor for native wrappers | Ship fast as PWA, wrap for App Store later if needed |
+
+---
+
+## Future Roadmap (Post v1.0)
 
 - **Trip Memory screen** — post-trip review with highlights, lowlights, "would do again / would skip", tips for next time
-- **Budget tracker** — planned vs actual spending by category
-- **Multi-trip support** — trip history, import/export multiple trips
-- **Photo gallery** — store photo references per activity with timestamp matching
+- **Budget tracker** — planned vs actual spending by category with visualizations
 - **Collaborative mode** — share trip state with travel partner via shared URL or QR code
-- **Claude integration UI** — direct export format optimized for Claude's planning prompt
-- **Notification reminders** — "15 min until next activity" push notifications
+- **Notification reminders** — push notifications for upcoming activities
 - **Offline maps integration** — embedded map view with offline tile support
 - **Activity reordering** — drag and drop to rearrange day schedule
 - **Mileage odometer** — log actual odometer readings at each gas stop for real MPG tracking
 - **Trip photo timeline** — link photos from camera roll to activities by timestamp matching
 - **Multi-day weather prefetch** — fetch full trip forecast in one API call when online
+- **Social features** — share trip recaps publicly, follow other travelers' routes
+- **AI concierge** — "What should I do with 2 free hours in Marfa?" answered using your preferences + local knowledge
