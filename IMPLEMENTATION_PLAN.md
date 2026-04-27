@@ -224,6 +224,110 @@ const reschedule = (actId, newDayNumber, newTime) => {
 - Auto-scroll to first pending activity on page load
 - Dashboard shows today's view when mid-trip, not requiring navigation
 
+### 1.11 Multi-Voice Ratings & Notes (Family Profile)
+
+**Concept:** One family profile, but ratings and notes are tagged with who said them. Enables Claude to understand individual preferences within the family unit when planning future trips.
+
+**Trip config change — named travelers:**
+```javascript
+{
+  "travelers": [
+    { "id": "bt", "name": "BT" },
+    { "id": "s", "name": "S" }
+  ]
+}
+```
+
+**Activity rating schema change:**
+```javascript
+// Old (single rating)
+{
+  "status": "done",
+  "rating": 5,
+  "notes": "amazing views"
+}
+
+// New (multi-voice ratings)
+{
+  "status": "done",
+  "ratings": [
+    { "by": "bt", "rating": 5, "note": "Diego Burger lived up to the hype" },
+    { "by": "s",  "rating": 3, "note": "Food was good but $65 for two felt steep" }
+  ],
+  // Keep legacy fields for backward compat
+  "rating": 4,    // auto-calculated average
+  "notes": ""     // deprecated, use ratings[].note
+}
+```
+
+**Check-off modal flow:**
+```
+┌──────────────────────────────────────────┐
+│  Completing: Starlight Theatre            │
+│                                           │
+│  Who's rating?                            │
+│  [BT]  [S]  [Both - same rating]         │
+│                                           │
+│  ★★★★★  (if BT selected)                 │
+│  Note: [Diego Burger was incredible  ]    │
+│                                           │
+│  [+ Add S's take]                         │
+│                                           │
+│  [Skip]                    [Save]         │
+└──────────────────────────────────────────┘
+
+After tapping "+ Add S's take":
+
+┌──────────────────────────────────────────┐
+│  BT: ★★★★★ "Diego Burger was incredible" │
+│                                           │
+│  S's rating:                              │
+│  ★★★☆☆                                   │
+│  Note: [Good but pricey for the area ]    │
+│                                           │
+│  [Skip]                    [Save All]     │
+└──────────────────────────────────────────┘
+```
+
+**Journal entries — also tagged:**
+```javascript
+{
+  "id": "j-123",
+  "by": "bt",        // who wrote it
+  "text": "Lost Mine at sunrise was life-changing",
+  "createdAt": "ISO",
+  "dayNumber": 5
+}
+```
+
+**Profile extraction — family consensus + divergences:**
+```javascript
+{
+  "familyConsensus": {
+    "hike": { "avgRating": { "bt": 4.5, "s": 4.0 }, "bothEnjoy": true },
+    "food": { "avgRating": { "bt": 4.2, "s": 3.5 }, "divergence": "budget" },
+    "experience": { "avgRating": { "bt": 4.8, "s": 4.8 }, "bothEnjoy": true }
+  },
+  "divergences": [
+    { "topic": "restaurant budget", "bt": "ok with $60+", "s": "prefers under $40" },
+    { "topic": "hike difficulty", "bt": "wants harder trails", "s": "prefers moderate" }
+  ]
+}
+```
+
+**Why not RAG:**
+- 10 trips = ~500KB of text, fits in Claude's context window
+- For 1-10 trips: send full data
+- For 10-50 trips: send profile + current trip + past trip summaries
+- RAG only needed at 50+ trips (years away)
+- Structured JSON is more reliable than embedding-based retrieval for this data size
+
+**Display changes:**
+- Activity detail modal shows each person's rating separately
+- Day summary shows "BT avg: 4.5★, S avg: 3.8★"
+- Dashboard best-rated shows both perspectives
+- Export includes all multi-voice data for Claude to read
+
 ---
 
 ## Phase 2: External APIs (v0.4)
@@ -820,6 +924,8 @@ const chatWithClaude = async (message) => {
 
 **Goal:** Dedicated expense management with filters and analysis.
 **Timeline:** 2-3 days
+
+**Expense model:** Family travels as one unit, one wallet. No per-person splitting, no "who paid", no settle-up. Just: what was spent, on what, on which day. Splitting/settle-up is a future feature only if traveling with non-family who keep separate tabs.
 
 ### 6.1 Expenses as a Nav Tab
 
